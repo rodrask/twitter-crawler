@@ -6,13 +6,6 @@ import twitter.crawler.common._
 import twitter.crawler.storages.DBStorage
 import twitter.crawler.rest.{RestRequest, RestActor}
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 31.01.12
- * Time: 3:03
- * To change this template use File | Settings | File Templates.
- */
 
 class SeedTask(filePath: String = "twi_top100.txt") extends Task {
   val usernames = loadNames("twi_top100.txt").toArray

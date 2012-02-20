@@ -6,14 +6,6 @@ import backtype.storm.utils.Utils
 import twitter.crawler.common.TwitterService
 import twitter4j.{FilterQuery, TwitterStream, Status}
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 09.02.12
- * Time: 23:46
- * To change this template use File | Settings | File Templates.
- */
-
 class TwitterStreamSpout(usersToListen: Seq[Long]) extends StormSpout(outputFields = List("tweet")) with Serializable {
   var twitterStream: TwitterStream = _
   var queue: LinkedBlockingQueue[Status] = _

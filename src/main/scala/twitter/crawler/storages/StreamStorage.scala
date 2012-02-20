@@ -6,16 +6,7 @@ import twitter4j.Status
 import java.util.Date
 import twitter.crawler.common.extractURL
 
-
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 14.02.12
- * Time: 1:04
- * To change this template use File | Settings | File Templates.
- */
-
-object streamStorage {
+object StreamStorage {
   val commonFile = "tweets.txt"
   val urlsFile = "urls.txt"
   val retweetsFile = "retweets.txt"

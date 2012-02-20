@@ -7,14 +7,6 @@ import scala.collection.JavaConversions._
 import twitter.crawler.common.TwitterService
 import twitter.crawler.common.TwitterService.authorize
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 15.02.12
- * Time: 0:00
- * To change this template use File | Settings | File Templates.
- */
-
 class TwitterSearchSpout extends StormSpout(outputFields = List("tweet")) {
   var twitter: Twitter = _
 

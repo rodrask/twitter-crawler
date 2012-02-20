@@ -4,14 +4,6 @@ import twitter4j.{TwitterFactory, TwitterStreamFactory}
 import twitter4j.auth.{OAuthSupport, AccessToken}
 import scala.collection.mutable.Map
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 31.01.12
- * Time: 3:12
- * To change this template use File | Settings | File Templates.
- */
-
 object TwitterService {
   val streamFactory = new TwitterStreamFactory()
   val restFactory = new TwitterFactory();

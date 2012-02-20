@@ -7,14 +7,6 @@ import actors.{Exit, Actor}
 import twitter4j.{TwitterException, TwitterFactory, TwitterStreamFactory}
 import actors.scheduler.DaemonScheduler
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 31.01.12
- * Time: 0:53
- * To change this template use File | Settings | File Templates.
- */
-
 case class TaskInfo(task: Task, properties: Map[String, Any])
 
 object TaskManager extends Actor {

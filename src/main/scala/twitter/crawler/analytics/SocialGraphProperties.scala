@@ -7,14 +7,6 @@ import org.neo4j.graphdb.{Direction, Node}
 import scala.util.Sorting.stableSort
 import twitter.crawler.storages.DBStorage
 
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 03.02.12
- * Time: 1:03
- * To change this template use File | Settings | File Templates.
- */
-
 object SocialGraphProperties {
   
   def topUsers ={
