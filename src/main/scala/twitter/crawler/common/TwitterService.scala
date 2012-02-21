@@ -10,7 +10,13 @@ object TwitterService {
 
   def newRestInstance = restFactory.getInstance
 
-  def accessToken(properties: Map[String, String]=properties) = new AccessToken(properties("access.token"), properties("access.secret"))
+  def accessToken(properties: Map[String, String]=properties): Option[AccessToken] = 
+  {
+    if ((properties contains "access.token") && (properties contains "access.secret"))
+      Some(new AccessToken(properties("access.token"), properties("access.secret")))
+    else
+      None
+  }
 
   var twitter = restFactory.getInstance()
   authorize(twitter)
@@ -20,6 +26,9 @@ object TwitterService {
 
   def authorize(twitter: OAuthSupport, properties: Map[String, String]=properties): Unit = {
     twitter.setOAuthConsumer(properties("consumer.key"), properties("consumer.secret"))
-    twitter.setOAuthAccessToken(accessToken())
+    accessToken() match {
+      case None => return;
+      case Some(token) => twitter.setOAuthAccessToken(token)
+    }
   }
 }
