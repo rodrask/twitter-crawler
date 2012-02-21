@@ -8,6 +8,8 @@ object TwitterService {
   val streamFactory = new TwitterStreamFactory()
   val restFactory = new TwitterFactory();
 
+  def newRestInstance = restFactory.getInstance
+
   def accessToken(properties: Map[String, String]=properties) = new AccessToken(properties("access.token"), properties("access.secret"))
 
   var twitter = restFactory.getInstance()
