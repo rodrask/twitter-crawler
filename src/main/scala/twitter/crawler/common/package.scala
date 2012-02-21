@@ -3,12 +3,11 @@ package twitter.crawler
 import scala.collection.mutable.Map
 import scala.collection.JavaConversions._
 import scala.io.Source.fromFile
-import util.matching.Regex
 import twitter4j.URLEntity
+import scala.util.matching.Regex
 
 package object common {
-
-	val properties = loadConf("src/main/resources/app.properties")
+	val properties = loadConf("app.properties")
 
 	def loadConf(name: String): Map[String, String] = {
 		val file = new java.io.FileInputStream(name)

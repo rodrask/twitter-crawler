@@ -2,10 +2,10 @@ package twitter.crawler.tasks
 
 import collection.mutable.ListBuffer
 
-import util.Random
 import org.neo4j.graphdb.Node
 import twitter.crawler.storages.DBStorage
 import twitter.crawler.rest.{RestException, RestRequest, RestActor}
+import scala.util.Random
 
 /**
  * Created by IntelliJ IDEA.
