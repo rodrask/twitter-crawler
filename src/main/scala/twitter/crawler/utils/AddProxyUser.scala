@@ -10,11 +10,12 @@ object AddProxyUser extends App {
   val twitter: Twitter = TwitterService.newRestInstance
   twitter.setOAuthConsumer(properties("consumer.key"), properties("consumer.secret"))
   val requestToken = twitter.getOAuthRequestToken
-  Console.printf("Url for access: %s", requestToken.getAuthorizationURL)
+  Console.printf("Url for access: %s\n", requestToken.getAuthorizationURL)
   val pin = Console.readLine()
+  Console.println("pin "+pin)
   val accessToken = twitter.getOAuthAccessToken(requestToken, pin)
-
-  val file = new FileWriter("accounts.properties", true)
+  Console.println("at "+accessToken.getToken+" "+accessToken.getTokenSecret)
+  val file = new FileWriter("src/main/resources/accounts.properties", true)
   file.write("%s.access.token=%s\n".format(clientName, accessToken.getToken))
   file.write("%s.access.secret=%s\n".format(clientName, accessToken.getTokenSecret))
   file.close()
