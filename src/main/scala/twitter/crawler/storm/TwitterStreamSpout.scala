@@ -1,5 +1,4 @@
 package twitter.crawler.storm
-
 import storm.scala.dsl.StormSpout
 import java.util.concurrent.LinkedBlockingQueue
 import backtype.storm.utils.Utils

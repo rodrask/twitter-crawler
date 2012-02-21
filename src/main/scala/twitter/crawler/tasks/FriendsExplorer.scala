@@ -6,15 +6,6 @@ import org.neo4j.graphdb.Node
 import twitter.crawler.storages.DBStorage
 import twitter.crawler.rest.{RestException, RestRequest, RestActor}
 import scala.util.Random
-
-/**
- * Created by IntelliJ IDEA.
- * User: bernx
- * Date: 02.02.12
- * Time: 1:35
- * To change this template use File | Settings | File Templates.
- */
-
 case class FriendsExplorerResult(user: Long, friends: List[Long], usedCalls: Int)
 
 class FriendsExplorer extends Task {

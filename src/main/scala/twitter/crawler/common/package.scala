@@ -7,7 +7,7 @@ import twitter4j.URLEntity
 import scala.util.matching.Regex
 
 package object common {
-	val properties = loadConf("app.properties")
+	val properties = loadConf("src/main/resources/app.properties")
 
 	def loadConf(name: String): Map[String, String] = {
 		val file = new java.io.FileInputStream(name)
