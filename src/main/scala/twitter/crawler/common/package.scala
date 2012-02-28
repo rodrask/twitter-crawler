@@ -8,6 +8,7 @@ import scala.util.matching.Regex
 
 package object common {
 	val properties = loadConf("src/main/resources/app.properties")
+  val accountProperties = loadConf("src/main/resources/account.properties")
 
 	def loadConf(name: String): Map[String, String] = {
 		val file = new java.io.FileInputStream(name)
