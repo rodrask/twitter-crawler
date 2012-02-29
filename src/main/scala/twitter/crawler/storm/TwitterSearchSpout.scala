@@ -12,14 +12,17 @@ class TwitterSearchSpout extends StormSpout(outputFields = List("tweet")) {
 
   setup {
     twitter = TwitterService.restFactory.getInstance()
-    authorize(twitter)
+    authorize(twitter, "search")
   }
 
 
   def nextTuple = {
 
 
+
   }
+
+  def
 
   def search(data: String, c:Int=1): Option[Seq[Tweet]] = {
     if (c > 3){
