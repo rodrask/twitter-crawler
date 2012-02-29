@@ -3,8 +3,7 @@ package twitter.crawler.storm
 import backtype.storm.tuple.Tuple
 import storm.scala.dsl.StormBolt
 import twitter4j.Status
-import twitter.crawler.storages.StreamStorage._
-import twitter.crawler.storages.TweetStorage.saveTweet
+import twitter.crawler.storages.TweetStorage._
 import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.FutureTasksStorage._
 import twitter.crawler.storages.StatisticStorage._
@@ -16,7 +15,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 		if (status.isRetweet)
 		{
 			val rStatus  = status.getRetweetedStatus
-			if (! inIndex(rStatus)){
+			if (!indexed(rStatus)){
 				saveTweet(rStatus)
 			}
 
@@ -76,6 +75,5 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
         t ack
     }
   override def cleanup():scala.Unit={
-    end
   }
 }
