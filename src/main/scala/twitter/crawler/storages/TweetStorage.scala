@@ -8,4 +8,8 @@ object TweetStorage {
 
   }
 
+  def indexed(status: Status) = {
+    true
+  }
+
 }

@@ -16,21 +16,26 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   val indexProperties: IndexCustomConfig = Some(Map("provider" -> "lucene", "type" -> "exact"))
 
   override def NodeIndexConfig = ("users", indexProperties) ::("urls", indexProperties) ::
-    ("hashtags", indexProperties)::Nil
+    ("hashtags", indexProperties) :: Nil
 
   override def RelationIndexConfig =
     ("retweets", indexProperties) ::
-    ("urls", indexProperties) ::
-    ("mentions", indexProperties) ::
-    ("hashtags", indexProperties)  ::Nil
+      ("urls", indexProperties) ::
+      ("mentions", indexProperties) ::
+      ("hashtags", indexProperties) :: Nil
 
   def userIndex = getNodeIndex("user").get
+
   def urlIndex = getNodeIndex("urls").get
+
   def tagIndex = getNodeIndex("hashtags").get
 
   def retweetsIndex = getRelationIndex("retweets").get
+
   def urlMentionIndex = getRelationIndex("urls").get
+
   def mentionIndex = getRelationIndex("mentions").get
+
   def tagMentionIndex = getRelationIndex("hashtags").get
 
 
@@ -38,8 +43,8 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     shutdown(ds)
   }
 
-  
-  private def getNode[T](index: Index[Node], field: String)(value: T): Option[Node]={
+
+  private def getNode[T](index: Index[Node], field: String)(value: T): Option[Node] = {
     val hits = index.get(field, value.toString)
     val result = hits.getSingle
     hits.close()
@@ -47,18 +52,20 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   }
 
   private def getUrl = getNode(urlIndex, "url")
+
   private def getHashTag = getNode(tagIndex, "tag")
+
   def getUserById = getNode[Long](userIndex, "twId")
+
   def getUserByName = getNode[String](userIndex, "name")
 
-  def insertUser(user: User)(implicit ds: DatabaseService) = {
+  def insertFullUser(user: User)(implicit ds: DatabaseService) = {
     val userNode = getUserById(user.getId) match {
       case None =>
         insertStubUser(Left(user.getId))
       case Some(node) =>
         node
     }
-
     userNode("twId") = user.getId
     userIndex +=(userNode, "twId", user.getId.toString)
 
@@ -92,32 +99,32 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     node
   }
 
-  def getOrInsertUser(userName: String): Node = getUserByName(userName) match {
+  def getOrInsert(getFunc: String => Option[Node], createFunc: String => Node)(name: String): Node = getFunc(name) match {
     case Some(node) => node
-    case None => insertStubUser(Right(userName))
+    case None => createFunc(name)
   }
 
-  def getOrInsertUrl(url: String): Node = getUrl(url) match {
-    case Some(node) => node
-    case None => 
+  def getOrInsertUser: (String => Node) = getOrInsert(getUserByName(_), x => insertStubUser(Right(x)))
+
+  def getOrInsertUrl: (String => Node) = getOrInsert(getUrl(_), {
+    url =>
       val result = createNode
       result("url") = url
-      urlIndex += (result, "url", url)
-      return result
-  }
-  
-  def getOrInsertHashTag(hashTag: String): Node = getHashTag(hashTag) match {
-    case Some(node) => node
-    case None =>
+      urlIndex +=(result, "url", url)
+      result
+  })
+
+  def getOrInsertHashTag = getOrInsert(getHashTag(_), {
+    tag =>
       val result = createNode
-      result("hashtag") = hashTag
-      tagIndex += (result, "tag", hashTag)
-      return result
-  }
+      result("hashtag") = tag
+      tagIndex +=(result, "tag", tag)
+      result
+  })
 
   case class CommonRelProperties(timestamp: Long, messageId: Long)
-  
-  def saveRetweet(fromUser: String, toUser: String, thisMessageId: Long, baseMessageId:Long, date: Date)={
+
+  def saveRetweet(fromUser: String, toUser: String, thisMessageId: Long, baseMessageId: Long, date: Date) = {
     withTx {
       implicit ds: DatabaseService =>
         val from: Node = getOrInsertUser(fromUser)
@@ -127,17 +134,30 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
         rel("ts") = date.getTime
         rel("mId") = thisMessageId
         rel("baseMessageId") = baseMessageId
+
+        retweetsIndex +=(rel, "fromUser", from)
+        retweetsIndex +=(rel, "toUser", to)
+        retweetsIndex +=(rel, "timestamp", date.getTime.toString)
+        retweetsIndex +=(rel, "baseMessage", baseMessageId.toString)
+        retweetsIndex +=(rel, "thisMessage", baseMessageId.toString)
+
     }
   }
+
   def saveMention(fromUser: String, toUser: String, ts: Date, messageId: Long) = {
     withTx {
       implicit ds: DatabaseService =>
         val from: Node = getOrInsertUser(fromUser)
         val to: Node = getOrInsertUser(toUser)
         val rel: Relationship = from --> "MENTION" --> to <()
-        
+
         rel("ts") = ts.getTime
         rel("mId") = messageId
+
+        mentionIndex +=(rel, "fromUser", fromUser)
+        mentionIndex +=(rel, "toUser", toUser)
+        mentionIndex +=(rel, "mId", messageId.toString)
+        mentionIndex +=(rel, "timestamp", ts.getTime.toString)
     }
 
   }
@@ -151,7 +171,11 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
 
         rel("ts") = when.getTime
         rel("mId") = messageId
-      
+
+        urlMentionIndex +=(rel, "fromUser", user)
+        urlMentionIndex +=(rel, "mId", messageId.toString)
+        urlMentionIndex +=(rel, "timestamp", when.getTime.toString)
+
     }
 
   }
@@ -160,15 +184,16 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     withTx {
       implicit ds: DatabaseService =>
         val userNode = getOrInsertUser(user)
-        val tagNode = getOrInsertTag(user)
+        val tagNode = getOrInsertHashTag(hashTag)
         val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
 
         rel("ts") = when.getTime
         rel("mId") = messageId
-        indexRelation()
 
+        tagMentionIndex +=(rel, "fromUser", user)
+        tagMentionIndex +=(rel, "mId", messageId.toString)
+        tagMentionIndex +=(rel, "timestamp", when.getTime.toString)
     }
-
   }
 
   def saveHashTagUsage(hashTag: String, when: Date) = {
