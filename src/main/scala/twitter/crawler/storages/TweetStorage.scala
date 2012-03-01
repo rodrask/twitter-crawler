@@ -11,7 +11,7 @@ import org.apache.lucene.document._
 object TweetStorage {
 
 	val analyzer = new StandardAnalyzer(Version.LUCENE_CURRENT)
-  val filedir = new java.io.File("tweets_storage")
+  val filedir = new java.io.File("storage/tweets_storage")
   val directory = new NIOFSDirectory(filedir)
 
   if (!filedir.exists) { filedir.mkdir }

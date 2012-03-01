@@ -6,8 +6,8 @@ import twitter4j.Status
 import twitter.crawler.storages.TweetStorage._
 import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.FutureTasksStorage._
-import twitter.crawler.storages.StatisticStorage._
 import twitter.crawler.common.extractURL
+import java.util.Date
 
 class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 
@@ -20,7 +20,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 			}
 
 			saveRetweet(status.getUser.getScreenName, rStatus.getUser.getScreenName, status.getId, rStatus.getId,status.getCreatedAt)
-			addFutureRetweetTask(rStatus.getId, rStatus.getCreatedAt)
+			addRTFutureTask(rStatus.getId)
 		}
 
 
@@ -46,7 +46,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 				val expandedUrl = extractURL(url)
 				saveUrlUsage(expandedUrl, date)
 				saveUrlPost(status.getUser.getScreenName, expandedUrl, status.getCreatedAt, status.getId)
-				addFutureUrlTask(expandedUrl)
+				addURLFutureTask(expandedUrl)
 		}
 	}
 
