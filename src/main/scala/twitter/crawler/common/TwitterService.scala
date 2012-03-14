@@ -1,34 +1,38 @@
 package twitter.crawler.common
 
-import twitter4j.{TwitterFactory, TwitterStreamFactory}
 import twitter4j.auth.{OAuthSupport, AccessToken}
 import scala.collection.mutable.Map
+import twitter4j.{Twitter, TwitterFactory, TwitterStreamFactory}
 
 object TwitterService {
+  val accountProperties = loadConf("src/main/resources/accounts.properties")
+  val access_token = "access.token"
+  val access_secret = "access.secret"
+
   val streamFactory = new TwitterStreamFactory()
   val restFactory = new TwitterFactory();
 
-  def newRestInstance = restFactory.getInstance
-
-  def accessToken(properties: Map[String, String]=properties): Option[AccessToken] = 
+  def newRestInstance(prefix: String=""): Twitter =
   {
-    if ((properties contains "access.token") && (properties contains "access.secret"))
-      Some(new AccessToken(properties("access.token"), properties("access.secret")))
-    else
-      None
+    val result = restFactory.getInstance
+    authorize(result, prefix)
+    result
   }
 
-  var twitter = restFactory.getInstance()
-  authorize(twitter)
+  var defaultTwitter = newRestInstance()
 
-  var stream = streamFactory.getInstance()
-  authorize(stream)
+  var defaultStream = streamFactory.getInstance()
+  authorize(defaultStream)
 
-  def authorize(twitter: OAuthSupport, properties: Map[String, String]=properties): Unit = {
-    twitter.setOAuthConsumer(properties("consumer.key"), properties("consumer.secret"))
-    accessToken() match {
-      case None => return;
-      case Some(token) => twitter.setOAuthAccessToken(token)
-    }
+  def setConsumer(twitter: OAuthSupport) = twitter.setOAuthConsumer(commonProperties("consumer.key"), commonProperties("consumer.secret"))
+  def createAccess(prefix: String = ""): AccessToken =
+  {
+    new AccessToken(accountProperties(prefix + access_token), accountProperties(prefix + access_secret))
+  }
+
+  def authorize(twitter: OAuthSupport, prefix: String = ""): Unit = {
+    setConsumer(twitter)
+    val pprefix = if (prefix.length() == 0) "." else prefix
+    twitter.setOAuthAccessToken(createAccess(pprefix))
   }
 }

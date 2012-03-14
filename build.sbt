@@ -5,13 +5,11 @@ version := "1.0"
 scalaVersion := "2.9.1"
 
 resolvers ++= Seq(
-	"twitter4j.org Repository" at "http://twitter4j.org/maven2/",
-	"fakod-snapshots" at "https://raw.github.com/FaKod/fakod-mvn-repo/master/snapshots")
+	"twitter4j.org Repository" at "http://twitter4j.org/maven2/")
 
 libraryDependencies ++= Seq(
 	"org.twitter4j" % "twitter4j-core" % "2.2.5",
 	"org.twitter4j" % "twitter4j-stream" % "2.2.5",
-	"org.neo4j" % "neo4j-scala" % "0.2.0-SNAPSHOT",
 	"redis.clients" % "jedis" % "2.0.0")
 
 unmanagedJars in Compile <++= baseDirectory map { base =>

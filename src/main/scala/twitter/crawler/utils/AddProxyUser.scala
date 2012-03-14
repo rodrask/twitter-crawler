@@ -2,13 +2,13 @@ package twitter.crawler.utils
 
 import twitter4j.Twitter
 import twitter.crawler.common.TwitterService
-import twitter.crawler.common.properties
+import twitter.crawler.common.commonProperties
 import java.io.FileWriter
 
 object AddProxyUser extends App {
   val clientName: String = args(0)
   val twitter: Twitter = TwitterService.newRestInstance
-  twitter.setOAuthConsumer(properties("consumer.key"), properties("consumer.secret"))
+  twitter.setOAuthConsumer(commonProperties("consumer.key"), commonProperties("consumer.secret"))
   val requestToken = twitter.getOAuthRequestToken
   Console.printf("Url for access: %s\n", requestToken.getAuthorizationURL)
   val pin = Console.readLine()

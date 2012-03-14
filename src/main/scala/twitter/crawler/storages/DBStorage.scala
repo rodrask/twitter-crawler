@@ -3,7 +3,7 @@ import sys.ShutdownHookThread
 import org.neo4j.graphdb.index.Index
 import org.neo4j.scala._
 import twitter4j.User
-import twitter.crawler.common.properties
+import twitter.crawler.common.commonProperties
 import collection.JavaConversions._
 import org.neo4j.graphdb.{Relationship, DynamicRelationshipType, Direction, Node}
 
@@ -182,6 +182,6 @@ class DBStorage(path: String = "tmp/twitter-graph") extends Neo4jWrapper with Ne
 
 object DBStorage {
   val DUMMY = "@DUMMYNAME@"
-  val storage: DBStorage = new DBStorage(properties("graphdb.path"))
+  val storage: DBStorage = new DBStorage(commonProperties("graphdb.path"))
   //  storage.start
 }

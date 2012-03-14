@@ -20,9 +20,6 @@ object TweetStorage {
 
 
   def saveTweet(status: Status) = {
-
-
-
   }
 
 

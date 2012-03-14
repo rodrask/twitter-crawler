@@ -13,5 +13,5 @@ case class Begin()
 
 trait Task extends Actor {
   var twLimits: Int
-  def twitter = TwitterService.twitter
+  def twitter = TwitterService.defaultTwitter
 }

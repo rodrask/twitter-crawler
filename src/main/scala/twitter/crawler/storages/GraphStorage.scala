@@ -1,208 +1,148 @@
 package twitter.crawler.storages
 
-import twitter.crawler.common.properties
+import twitter.crawler.common.commonProperties
+import scala.collection.JavaConversions._
 import sys.ShutdownHookThread
 import org.neo4j.scala.{DatabaseService, EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
-import java.util.Date
 import twitter4j.User
 import org.neo4j.graphdb.{Relationship, Node}
-import org.neo4j.graphdb.index.Index
+import org.neo4j.graphdb.index.UniqueFactory
+import java.util.{Map => JavaMap, Date}
+import org.neo4j.index.lucene.ValueContext
 
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider {
-  type UserId = Either[Long, String]
+  val USER_ID = "twId"
 
-  override def neo4jStoreDir = properties("graphdb.path")
+  override def neo4jStoreDir = commonProperties("graphdb.path")
 
   val indexProperties: IndexCustomConfig = Some(Map("provider" -> "lucene", "type" -> "exact"))
 
-  override def NodeIndexConfig = ("users", indexProperties) ::("urls", indexProperties) ::
-    ("hashtags", indexProperties) :: Nil
+  override def NodeIndexConfig = ("users", indexProperties) ::("entities", indexProperties) :: Nil
 
-  override def RelationIndexConfig =
-    ("retweets", indexProperties) ::
-      ("urls", indexProperties) ::
-      ("mentions", indexProperties) ::
-      ("hashtags", indexProperties) :: Nil
+  override def RelationIndexConfig = ("events", indexProperties) :: Nil
 
-  def userIndex = getNodeIndex("user").get
+  def userIndex = getNodeIndex("users").get
 
-  def urlIndex = getNodeIndex("urls").get
+  def entitiesIndex = getNodeIndex("entities").get
 
-  def tagIndex = getNodeIndex("hashtags").get
-
-  def retweetsIndex = getRelationIndex("retweets").get
-
-  def urlMentionIndex = getRelationIndex("urls").get
-
-  def mentionIndex = getRelationIndex("mentions").get
-
-  def tagMentionIndex = getRelationIndex("hashtags").get
-
+  def eventsIndex = getRelationIndex("events").get
 
   ShutdownHookThread {
+    println("shutdown hook")
     shutdown(ds)
   }
 
-
-  private def getNode[T](index: Index[Node], field: String)(value: T): Option[Node] = {
-    val hits = index.get(field, value.toString)
-    val result = hits.getSingle
-    hits.close()
-    if (result != null) Some(result) else None
-  }
-
-  private def getUrl = getNode(urlIndex, "url")
-
-  private def getHashTag = getNode(tagIndex, "tag")
-
-  def getUserById = getNode[Long](userIndex, "twId")
-
-  def getUserByName = getNode[String](userIndex, "name")
-
-  def insertFullUser(user: User)(implicit ds: DatabaseService) = {
-    val userNode = getUserById(user.getId) match {
-      case None =>
-        insertStubUser(Left(user.getId))
-      case Some(node) =>
-        node
+  private def getOrCreateUniqueUser(username: String) = {
+    val factory: UniqueFactory[Node] = new UniqueFactory.UniqueNodeFactory(userIndex) {
+      def initialize(created: Node, properties: JavaMap[String, AnyRef]) {
+        created("name") = properties get "name"
+        created("nodeType") = "USER"
+      }
     }
-    userNode("twId") = user.getId
-    userIndex +=(userNode, "twId", user.getId.toString)
-
-    userNode("name") = user.getScreenName
-    userIndex +=(userNode, "name", user.getScreenName)
-
-    val location = if (user.getLocation == null) "" else user.getLocation
-    userNode("location") = location
-    userIndex +=(userNode, "location", location)
-
-    userNode("creationDate") = user.getCreatedAt.getTime
-    userIndex +=(userNode, "creationDate", user.getCreatedAt.getTime.toString)
-
-    val lang = if (user.getLang == null) "" else user.getLang
-    userNode("lang") = lang
-    userIndex +=(userNode, "lang", lang)
+    factory.getOrCreate("name", username)
   }
 
-
-  def insertStubUser(userId: UserId): Node = {
-    val node = createNode
-    if (userId.isLeft) {
-      node("twId") = userId.left
-      userIndex +=(node, "twId", userId.left.toString)
+  private def getOrCreateUniqueEntity(name: String) = {
+    val factory: UniqueFactory[Node] = new UniqueFactory.UniqueNodeFactory(entitiesIndex) {
+      def initialize(created: Node, properties: JavaMap[String, AnyRef]) {
+        created("name") = properties get "name"
+        created("nodeType") = "ENTITY"
+      }
     }
-    else {
-      node("name") = userId.right
-      userIndex +=(node, "name", userId.right)
+    factory.getOrCreate("name", name)
+  }
 
+  private def getOrCreateUniqueUser(userId: Long) = {
+    val factory: UniqueFactory[Node] = new UniqueFactory.UniqueNodeFactory(userIndex) {
+      def initialize(created: Node, properties: JavaMap[String, AnyRef]) {
+        created(USER_ID) = properties get USER_ID
+        created("nodeType") = "USER"
+      }
     }
-    node
+    factory.getOrCreate(USER_ID, new ValueContext(userId) indexNumeric)
   }
 
-  def getOrInsert(getFunc: String => Option[Node], createFunc: String => Node)(name: String): Node = getFunc(name) match {
-    case Some(node) => node
-    case None => createFunc(name)
+  def indexUserInfo(user: User): Node = {
+    val userNode = getOrCreateUniqueUser(user.getScreenName)
+    if (userNode("i").isEmpty) {
+      userNode("creationDate") = user.getCreatedAt.getTime
+      userNode("i") = 1
+
+      userIndex +=(userNode, USER_ID, new ValueContext(user.getId) indexNumeric )
+      userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
+    }
+    userNode
   }
 
-  def getOrInsertUser: (String => Node) = getOrInsert(getUserByName(_), x => insertStubUser(Right(x)))
+  def saveEvent(ttype: String, rel: Relationship, id: Long, when: Date) = {
+    rel("ts") = when.getTime
+    rel("messageId") = id
 
-  def getOrInsertUrl: (String => Node) = getOrInsert(getUrl(_), {
-    url =>
-      val result = createNode
-      result("url") = url
-      urlIndex +=(result, "url", url)
-      result
-  })
+    eventsIndex +=(rel, "type", ttype)
+    eventsIndex +=(rel, "messageId", new ValueContext(id) indexNumeric())
+    eventsIndex +=(rel, "ts", new ValueContext(when getTime) indexNumeric())
+  }
 
-  def getOrInsertHashTag = getOrInsert(getHashTag(_), {
-    tag =>
-      val result = createNode
-      result("hashtag") = tag
-      tagIndex +=(result, "tag", tag)
-      result
-  })
-
-  case class CommonRelProperties(timestamp: Long, messageId: Long)
-
-  def saveRetweet(fromUser: String, toUser: String, thisMessageId: Long, baseMessageId: Long, date: Date) = {
+  def saveRetweet(fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) = {
+    val fromN: Node = indexUserInfo(fromU)
+    val toN: Node = indexUserInfo(toU)
     withTx {
       implicit ds: DatabaseService =>
-        val from: Node = getOrInsertUser(fromUser)
-        val to: Node = getOrInsertUser(toUser)
-        val rel: Relationship = from --> "RETWEET" --> to <()
+        val rel: Relationship = fromN --> "RT" --> toN <()
+        saveEvent("RT", rel, thisMessageId, when)
 
-        rel("ts") = date.getTime
-        rel("mId") = thisMessageId
         rel("baseMessageId") = baseMessageId
-
-        retweetsIndex +=(rel, "fromUser", from)
-        retweetsIndex +=(rel, "toUser", to)
-        retweetsIndex +=(rel, "timestamp", date.getTime.toString)
-        retweetsIndex +=(rel, "baseMessage", baseMessageId.toString)
-        retweetsIndex +=(rel, "thisMessage", baseMessageId.toString)
-
+        eventsIndex +=(rel, "baseMessage", new ValueContext(baseMessageId) indexNumeric())
+        println("Save Retweet")
     }
   }
 
-  def saveMention(fromUser: String, toUser: String, ts: Date, messageId: Long) = {
+  def saveMention(fromU: User, toScreenName: String, messageId: Long, when: Date) = {
+    val fromN: Node = indexUserInfo(fromU)
+    val toN: Node = getOrCreateUniqueUser(toScreenName)
     withTx {
       implicit ds: DatabaseService =>
-        val from: Node = getOrInsertUser(fromUser)
-        val to: Node = getOrInsertUser(toUser)
-        val rel: Relationship = from --> "MENTION" --> to <()
-
-        rel("ts") = ts.getTime
-        rel("mId") = messageId
-
-        mentionIndex +=(rel, "fromUser", fromUser)
-        mentionIndex +=(rel, "toUser", toUser)
-        mentionIndex +=(rel, "mId", messageId.toString)
-        mentionIndex +=(rel, "timestamp", ts.getTime.toString)
+        val rel: Relationship = fromN --> "MENTION" --> toN <()
+        saveEvent("MENTION", rel, messageId, when)
+        println("Save mention")
     }
 
   }
 
-  def saveUrlPost(user: String, url: String, when: Date, messageId: Long) = {
+  def saveUrl(user: User, url: String, messageId: Long, when: Date) = {
+    val userNode = indexUserInfo(user)
+    val urlNode = getOrCreateUniqueEntity(url)
     withTx {
       implicit ds: DatabaseService =>
-        val userNode = getOrInsertUser(user)
-        val urlNode = getOrInsertUrl(url)
         val rel: Relationship = userNode --> "POSTED" --> urlNode <()
-
-        rel("ts") = when.getTime
-        rel("mId") = messageId
-
-        urlMentionIndex +=(rel, "fromUser", user)
-        urlMentionIndex +=(rel, "mId", messageId.toString)
-        urlMentionIndex +=(rel, "timestamp", when.getTime.toString)
-
+        saveEvent("POSTED", rel, messageId, when)
+        println("Save url")
     }
 
   }
 
-  def saveHashTag(user: String, hashTag: String, when: Date, messageId: Long) = {
+  def saveHashTag(user: User, hashTag: String, messageId: Long, when: Date) = {
+    val userNode = indexUserInfo(user)
+    val tagNode = getOrCreateUniqueEntity(hashTag)
     withTx {
       implicit ds: DatabaseService =>
-        val userNode = getOrInsertUser(user)
-        val tagNode = getOrInsertHashTag(hashTag)
+
         val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
-
-        rel("ts") = when.getTime
-        rel("mId") = messageId
-
-        tagMentionIndex +=(rel, "fromUser", user)
-        tagMentionIndex +=(rel, "mId", messageId.toString)
-        tagMentionIndex +=(rel, "timestamp", when.getTime.toString)
+        saveEvent("TAGGED", rel, messageId, when)
+        println("Save Hash tag")
     }
   }
 
-  def saveHashTagUsage(hashTag: String, when: Date) = {
-
+  def saveFriendship(from: Long, to: Seq[Long]) = {
+    val fromN = getOrCreateUniqueUser(from)
+    withTx {
+      implicit ds: DatabaseService =>
+        to foreach {
+          friend:Long =>
+            val toN = getOrCreateUniqueUser(friend)
+            fromN --> "READS" --> toN
+        }
+        println("Save friendship")
+    }
   }
-
-  def saveUrlUsage(url: String, when: Date) = {
-
-  }
-
-
 }
