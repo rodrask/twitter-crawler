@@ -55,26 +55,27 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   private def getOrCreateUniqueUser(userId: Long) = {
     val factory: UniqueFactory[Node] = new UniqueFactory.UniqueNodeFactory(userIndex) {
       def initialize(created: Node, properties: JavaMap[String, AnyRef]) {
-        created(USER_ID) = properties get USER_ID
+        created(USER_ID) = properties(USER_ID).asInstanceOf[ValueContext].getValue
         created("nodeType") = "USER"
       }
     }
-    factory.getOrCreate(USER_ID, new ValueContext(userId) indexNumeric)
+    factory.getOrCreate(USER_ID, new ValueContext(userId))
   }
 
-  def indexUserInfo(user: User): Node = {
-    val userNode = getOrCreateUniqueUser(user.getScreenName)
+  private def indexUserInfo(user: User): Node = {
+    val userNode = getOrCreateUniqueUser(user.getId)
     if (userNode("i").isEmpty) {
+      userNode("name") = user.getScreenName
       userNode("creationDate") = user.getCreatedAt.getTime
       userNode("i") = 1
 
-      userIndex +=(userNode, USER_ID, new ValueContext(user.getId) indexNumeric )
+      userIndex +=(userNode, "name", user.getScreenName)
       userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
     }
     userNode
   }
 
-  def saveEvent(ttype: String, rel: Relationship, id: Long, when: Date) = {
+  private def saveEvent(ttype: String, rel: Relationship, id: Long, when: Date) = {
     rel("ts") = when.getTime
     rel("messageId") = id
 
@@ -83,53 +84,86 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     eventsIndex +=(rel, "ts", new ValueContext(when getTime) indexNumeric())
   }
 
-  def saveRetweet(fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) = {
-    val fromN: Node = indexUserInfo(fromU)
-    val toN: Node = indexUserInfo(toU)
-    withTx {
-      implicit ds: DatabaseService =>
-        val rel: Relationship = fromN --> "RT" --> toN <()
-        saveEvent("RT", rel, thisMessageId, when)
+  val QUERY = "type:%s AND messageId:%d"
 
-        rel("baseMessageId") = baseMessageId
-        eventsIndex +=(rel, "baseMessage", new ValueContext(baseMessageId) indexNumeric())
-        println("Save Retweet")
+  private def isNew(ttype: String, messageId: Long): Boolean = {
+    val hits = eventsIndex.query(QUERY.format(ttype, messageId))
+    val result = hits.getSingle
+    hits.close()
+    result == null
+  }
+
+
+  def saveRetweet(fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) = {
+    if (isNew("RT", thisMessageId)) {
+      withTx {
+        implicit ds: DatabaseService =>
+          val fromN: Node = indexUserInfo(fromU)
+          val toN: Node = indexUserInfo(toU)
+          val rel: Relationship = fromN --> "RT" --> toN <()
+          saveEvent("RT", rel, thisMessageId, when)
+          rel("baseMessageId") = baseMessageId
+          eventsIndex +=(rel, "baseMessage", new ValueContext(baseMessageId) indexNumeric())
+          println("Save Retweet user: "+fromU.getScreenName+" message: "+thisMessageId)
+      }
     }
   }
 
-  def saveMention(fromU: User, toScreenName: String, messageId: Long, when: Date) = {
-    val fromN: Node = indexUserInfo(fromU)
-    val toN: Node = getOrCreateUniqueUser(toScreenName)
-    withTx {
-      implicit ds: DatabaseService =>
-        val rel: Relationship = fromN --> "MENTION" --> toN <()
-        saveEvent("MENTION", rel, messageId, when)
-        println("Save mention")
+  def saveMention(fromU: User, toId:Long, toScreenName: String, messageId: Long, when: Date) = {
+    if (isNew("MENTION", messageId)) {
+      withTx {
+        implicit ds: DatabaseService =>
+          val fromN: Node = indexUserInfo(fromU)
+          val toN: Node = getOrCreateUniqueUser(toId)
+          if (toN("i").isEmpty){
+            toN("name") = toScreenName
+            toN("i") = 1
+            userIndex += (toN, "name", toScreenName)
+          }
+          val rel: Relationship = fromN --> "MENTION" --> toN <()
+          saveEvent("MENTION", rel, messageId, when)
+          println("Save mention user "+fromU.getScreenName+" mention "+toScreenName)
+      }
     }
 
   }
 
   def saveUrl(user: User, url: String, messageId: Long, when: Date) = {
-    val userNode = indexUserInfo(user)
-    val urlNode = getOrCreateUniqueEntity(url)
-    withTx {
-      implicit ds: DatabaseService =>
-        val rel: Relationship = userNode --> "POSTED" --> urlNode <()
-        saveEvent("POSTED", rel, messageId, when)
-        println("Save url")
+    if (isNew("POSTED", messageId)) {
+      withTx {
+        implicit ds: DatabaseService =>
+          val urlNode = getOrCreateUniqueEntity(url)
+          val userNode = indexUserInfo(user)
+          val rel: Relationship = userNode --> "POSTED" --> urlNode <()
+          saveEvent("POSTED", rel, messageId, when)
+          println("Save url user "+user.getScreenName+" posted "+url)
+      }
     }
+  }
 
+  def saveUrl(username: String, url: String, messageId: Long, when: Date) = {
+    if (isNew("POSTED", messageId)) {
+      withTx {
+        implicit ds: DatabaseService =>
+          val userNode = getOrCreateUniqueUser(username)
+          val urlNode = getOrCreateUniqueEntity(url)
+          val rel: Relationship = userNode --> "POSTED" --> urlNode <()
+          saveEvent("POSTED", rel, messageId, when)
+          println("Save refinement url user "+username+" posted "+url)
+      }
+    }
   }
 
   def saveHashTag(user: User, hashTag: String, messageId: Long, when: Date) = {
-    val userNode = indexUserInfo(user)
-    val tagNode = getOrCreateUniqueEntity(hashTag)
-    withTx {
-      implicit ds: DatabaseService =>
-
-        val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
-        saveEvent("TAGGED", rel, messageId, when)
-        println("Save Hash tag")
+    if (isNew("TAGGED", messageId)) {
+      withTx {
+        implicit ds: DatabaseService =>
+          val userNode = indexUserInfo(user)
+          val tagNode = getOrCreateUniqueEntity(hashTag)
+          val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
+          saveEvent("TAGGED", rel, messageId, when)
+          println("Save Hash tag user "+user.getScreenName+" posted "+hashTag)
+      }
     }
   }
 
@@ -138,7 +172,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     withTx {
       implicit ds: DatabaseService =>
         to foreach {
-          friend:Long =>
+          friend: Long =>
             val toN = getOrCreateUniqueUser(friend)
             fromN --> "READS" --> toN
         }

@@ -9,8 +9,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
 	"org.twitter4j" % "twitter4j-core" % "2.2.5",
-	"org.twitter4j" % "twitter4j-stream" % "2.2.5",
-	"redis.clients" % "jedis" % "2.0.0")
+	"org.twitter4j" % "twitter4j-stream" % "2.2.5")
 
 unmanagedJars in Compile <++= baseDirectory map { base =>
 	val baseDirectories = (base / "lib") +++ (base / "neo4j-libs") +++ (base / "storm-libs")

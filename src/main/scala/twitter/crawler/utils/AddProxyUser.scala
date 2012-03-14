@@ -7,8 +7,8 @@ import java.io.FileWriter
 
 object AddProxyUser extends App {
   val clientName: String = args(0)
-  val twitter: Twitter = TwitterService.newRestInstance
-  twitter.setOAuthConsumer(commonProperties("consumer.key"), commonProperties("consumer.secret"))
+  val twitter: Twitter = TwitterService.anonymousInstance
+
   val requestToken = twitter.getOAuthRequestToken
   Console.printf("Url for access: %s\n", requestToken.getAuthorizationURL)
   val pin = Console.readLine()

@@ -6,6 +6,7 @@ import twitter4j.Status
 import twitter.crawler.storages.TweetStorage._
 import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.common.extractURL
+import twitter.crawler.storages.FutureTasksStorage
 
 class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 
@@ -16,9 +17,8 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
         saveTweet(rStatus)
       }
       saveRetweet(status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
+      FutureTasksStorage ! ('put, rStatus.getId)
     }
-
-
   }
 
   def performMentions(status: Status): Unit = {
@@ -28,7 +28,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
     val id = status.getId
     mentions foreach {
       mention =>
-        saveMention(status.getUser, mention.getScreenName, id, status.getCreatedAt)
+        saveMention(status.getUser, mention.getId, mention.getScreenName, id, status.getCreatedAt)
     }
   }
 
@@ -40,6 +40,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
       url =>
         val expandedUrl = extractURL(url)
         saveUrl(status.getUser, expandedUrl, status.getId, status.getCreatedAt)
+        FutureTasksStorage ! ('put, expandedUrl)
     }
   }
 

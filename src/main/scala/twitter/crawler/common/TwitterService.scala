@@ -19,6 +19,12 @@ object TwitterService {
     result
   }
 
+  def anonymousInstance = {
+    val result = restFactory.getInstance
+    setConsumer(result)
+    result
+  }
+
   var defaultTwitter = newRestInstance()
 
   var defaultStream = streamFactory.getInstance()
@@ -32,7 +38,7 @@ object TwitterService {
 
   def authorize(twitter: OAuthSupport, prefix: String = ""): Unit = {
     setConsumer(twitter)
-    val pprefix = if (prefix.length() == 0) "." else prefix
+    val pprefix = if (prefix.length() == 0) prefix else prefix+"."
     twitter.setOAuthAccessToken(createAccess(pprefix))
   }
 }
