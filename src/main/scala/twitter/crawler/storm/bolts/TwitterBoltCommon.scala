@@ -6,6 +6,7 @@ import twitter4j.Status
 import twitter.crawler.storages.TweetStorage._
 import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.common.extractURL
+import twitter.crawler.utils.UrlEnlarger.enlarge
 import twitter.crawler.storages.FutureTasksStorage
 
 class TwitterBoltCommon extends StormBolt(outputFields = List()) {
@@ -13,7 +14,7 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
   def performRetweet(status: Status): Unit = {
     if (status.isRetweet) {
       val rStatus = status.getRetweetedStatus
-      if (!indexed(rStatus)) {
+      if (! indexed(rStatus)) {
         saveTweet(rStatus)
       }
       saveRetweet(status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
@@ -38,9 +39,18 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
       return
     urls foreach {
       url =>
-        val expandedUrl = extractURL(url)
-        saveUrl(status.getUser, expandedUrl, status.getId, status.getCreatedAt)
-        FutureTasksStorage ! ('put, expandedUrl)
+        val extractedUrl = extractURL(url)
+        var enlargedUrl: String = null
+        try {
+          enlargedUrl = enlarge(extractedUrl)
+        }
+        catch {
+          case ex: Exception =>
+            println("Exception when enlarging url: "+ex.getMessage)
+            enlargedUrl = extractedUrl
+        }
+        saveUrl(status.getUser, extractedUrl, enlargedUrl, status.getId, status.getCreatedAt)
+        FutureTasksStorage ! ('put, enlargedUrl)
     }
   }
 
