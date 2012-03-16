@@ -8,6 +8,7 @@ import scala.util.matching.Regex
 
 package object common {
 	val commonProperties = loadConf("src/main/resources/app.properties")
+  val storageProperties = loadConf("src/main/resources/storages.properties")
 
 	def loadConf(name: String): Map[String, String] = {
 		val file = new java.io.FileInputStream(name)
@@ -22,7 +23,7 @@ package object common {
     val twiRegex(name) = address;
     name
   }
-  
+
   def loadNames(file: String): List[String]={
     (fromFile(file).getLines map parseURL).toList
   }

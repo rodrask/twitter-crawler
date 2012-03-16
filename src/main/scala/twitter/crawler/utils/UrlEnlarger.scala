@@ -12,6 +12,7 @@ import java.util.{Calendar, Date}
 
 object UrlEnlarger {
   val DEFAULT_FILE = "src/main/resources/services.properties"
+  val HTTP_PREFIX = "http[s]{0,1}://"
   val h = new Http with Safety {
 
     import org.apache.http.params.CoreConnectionPNames
@@ -46,7 +47,7 @@ object UrlEnlarger {
   }
 
   def loadShortServices(filename: String = DEFAULT_FILE): List[Regex] = {
-    Source.fromFile(filename).getLines.toList.map(l => new Regex(l))
+    Source.fromFile(filename).getLines.toList.map(l => new Regex(HTTP_PREFIX+l))
   }
 
   val enlargeRequest: Request = url("http://api.longurl.org/v2/expand") <:< Map("User-Agent" -> "Twitter-crawler/0.1")
@@ -72,6 +73,7 @@ object UrlEnlarger {
       else {
         println("New url")
         var isOk: Boolean = true
+
         val eUrl: String = h x (enlargeRequest <<? Map("url" -> url) <> {
           n => (n \\ "long-url").head.text
         }) {
@@ -81,6 +83,7 @@ object UrlEnlarger {
             isOk = false
             url
         }
+
         if (isOk) {
           urlCache(url) = eUrl
 

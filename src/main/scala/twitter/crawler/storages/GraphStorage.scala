@@ -1,6 +1,6 @@
 package twitter.crawler.storages
 
-import twitter.crawler.common.commonProperties
+import twitter.crawler.common.storageProperties
 import scala.collection.JavaConversions._
 import sys.ShutdownHookThread
 import org.neo4j.scala.{DatabaseService, EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
@@ -13,7 +13,7 @@ import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider {
   val USER_ID = "twId"
 
-  override def neo4jStoreDir = commonProperties("graphdb.path")
+  override def neo4jStoreDir = storageProperties("graph.storage")
 
   val indexProperties: IndexCustomConfig = Some(Map("provider" -> "lucene", "type" -> "exact"))
 
