@@ -5,7 +5,7 @@ import scala.collection.mutable.Map
 import twitter4j.{Twitter, TwitterFactory, TwitterStreamFactory}
 
 object TwitterService {
-  val accountProperties = loadConf("src/main/resources/accounts.properties")
+  val accountProperties = loadConf("src/main/resources/app.properties")
   val access_token = "access.token"
   val access_secret = "access.secret"
 

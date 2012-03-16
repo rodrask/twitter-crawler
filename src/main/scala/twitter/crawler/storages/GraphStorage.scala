@@ -141,28 +141,33 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
 
   }
 
-  def saveUrl(user: User, url: String, messageId: Long, when: Date) = {
+  def saveUrl(user: User, showedUrl: String, realUrl: String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
-          val urlNode = getOrCreateUniqueEntity(url)
+          val urlNode = getOrCreateUniqueEntity(realUrl)
           val userNode = indexUserInfo(user)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
+
+          rel("showedUrl") = showedUrl
+          eventsIndex +=(rel, "showedUrl", showedUrl)
+
           saveEvent("POSTED", rel, messageId, when)
-          println("Save url user " + user.getScreenName + " posted " + url)
+          println("Save url user "+user.getScreenName+" posted "+realUrl)
       }
     }
   }
 
-  def saveUrl(username: String, url: String, messageId: Long, when: Date) = {
+  def saveUrlFromSearch(username: String, realUrl:String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
           val userNode = getOrCreateUniqueUser(username)
-          val urlNode = getOrCreateUniqueEntity(url)
+          val urlNode = getOrCreateUniqueEntity(realUrl)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
           saveEvent("POSTED", rel, messageId, when)
-          println("Save refinement url user " + username + " posted " + url)
+          println("Save refinement url user " + username + " posted " + realUrl)
+
       }
     }
   }
