@@ -1,5 +1,6 @@
 package twitter.crawler.storages
 
+import org.neo4j.cypher.{CypherParser, ExecutionEngine}
 import twitter.crawler.common.storageProperties
 import com.codahale.logula.Logging
 import scala.collection.JavaConversions._
@@ -194,6 +195,22 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
             log.info("Save friendship: user %d reads %d", fromN, toN)
         }
     }
+  }
+
+  /*
+  * Ниже буду аналитические функции
+
+  */
+
+  val cypherParser = new CypherParser
+  val engine = new ExecutionEngine(ds.gds);
+
+  def foreverAloneUsers(): Seq[Node]={
+    Nil
+  }
+
+  def partialUsers(): Seq[Node]={
+    Nil
   }
 
   def batchNodesWithoutFriends(size: Int): List[Node] = {
