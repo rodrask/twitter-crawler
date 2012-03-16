@@ -5,10 +5,10 @@ import scala.collection.JavaConversions._
 import sys.ShutdownHookThread
 import org.neo4j.scala.{DatabaseService, EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
 import twitter4j.User
-import org.neo4j.graphdb.{Relationship, Node}
 import org.neo4j.graphdb.index.UniqueFactory
 import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
+import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node}
 
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider {
   val USER_ID = "twId"
@@ -62,11 +62,24 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     factory.getOrCreate(USER_ID, new ValueContext(userId))
   }
 
-  private def indexUserInfo(user: User): Node = {
+  def indexUserInfo(user: User): Node = {
     val userNode = getOrCreateUniqueUser(user.getId)
     if (userNode("i").isEmpty) {
       userNode("name") = user.getScreenName
       userNode("creationDate") = user.getCreatedAt.getTime
+
+      val location = if (user.getLocation == null) "" else user.getLocation
+      val lang = if (user.getLang == null) "" else user.getLang
+      val description = if (user.getDescription == null) "" else user.getDescription
+
+      userNode("location") = location
+      userNode("lang") = lang
+      userNode("description") = description
+      userNode("followersCount") = user.getFollowersCount
+      userNode("friendsCount") = user.getFriendsCount
+      userNode("statusesCount") = user.getStatusesCount
+      userNode("isProtected") = user.isProtected
+
       userNode("i") = 1
 
       userIndex +=(userNode, "name", user.getScreenName)
@@ -104,25 +117,25 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           saveEvent("RT", rel, thisMessageId, when)
           rel("baseMessageId") = baseMessageId
           eventsIndex +=(rel, "baseMessage", new ValueContext(baseMessageId) indexNumeric())
-          println("Save Retweet user: "+fromU.getScreenName+" message: "+thisMessageId)
+          println("Save Retweet user: " + fromU.getScreenName + " message: " + thisMessageId)
       }
     }
   }
 
-  def saveMention(fromU: User, toId:Long, toScreenName: String, messageId: Long, when: Date) = {
+  def saveMention(fromU: User, toId: Long, toScreenName: String, messageId: Long, when: Date) = {
     if (isNew("MENTION", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
           val fromN: Node = indexUserInfo(fromU)
           val toN: Node = getOrCreateUniqueUser(toId)
-          if (toN("i").isEmpty){
+          if (toN("i").isEmpty) {
             toN("name") = toScreenName
             toN("i") = 1
-            userIndex += (toN, "name", toScreenName)
+            userIndex +=(toN, "name", toScreenName)
           }
           val rel: Relationship = fromN --> "MENTION" --> toN <()
           saveEvent("MENTION", rel, messageId, when)
-          println("Save mention user "+fromU.getScreenName+" mention "+toScreenName)
+          println("Save mention user " + fromU.getScreenName + " mention " + toScreenName)
       }
     }
 
@@ -136,7 +149,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val userNode = indexUserInfo(user)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
           saveEvent("POSTED", rel, messageId, when)
-          println("Save url user "+user.getScreenName+" posted "+url)
+          println("Save url user " + user.getScreenName + " posted " + url)
       }
     }
   }
@@ -149,7 +162,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val urlNode = getOrCreateUniqueEntity(url)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
           saveEvent("POSTED", rel, messageId, when)
-          println("Save refinement url user "+username+" posted "+url)
+          println("Save refinement url user " + username + " posted " + url)
       }
     }
   }
@@ -162,7 +175,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val tagNode = getOrCreateUniqueEntity(hashTag)
           val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
           saveEvent("TAGGED", rel, messageId, when)
-          println("Save Hash tag user "+user.getScreenName+" posted "+hashTag)
+          println("Save Hash tag user " + user.getScreenName + " posted " + hashTag)
       }
     }
   }
@@ -179,4 +192,19 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
         println("Save friendship")
     }
   }
+
+  def batchNodesWithoutFriends(size: Int): List[Node] = {
+    withTx {
+      implicit db =>
+        getAllNodes filterNot (n => n.hasRelationship(Direction.OUTGOING, DynamicRelationshipType.withName("READS"))) drop (1) take (size) toList
+    }
+  }
+
+  def getUsersNotIndex(size: Int): List[Node] = {
+    withTx {
+      implicit db =>
+        getAllNodes filter (n => !n.hasProperty("name") && n.hasProperty(USER_ID) && n.getProperty(USER_ID) != 1) drop (1) take (size) toList
+    }
+  }
+
 }
