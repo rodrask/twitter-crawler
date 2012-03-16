@@ -1,5 +1,6 @@
 package twitter.crawler
-
+import com.codahale.logula.Logging
+import org.apache.log4j.Level
 import scala.collection.mutable.Map
 import scala.collection.JavaConversions._
 import scala.io.Source.fromFile
@@ -36,4 +37,16 @@ package object common {
     println("Strange entity: "+e)
     null
   }
+
+  Logging.configure { log =>
+    log.level = Level.INFO
+    log.console.enabled = true
+    log.console.threshold = Level.INFO
+
+    log.file.enabled = true
+    log.file.filename = storageProperties("logs.storage")
+    log.file.maxSize = 100 * 1024 // KB
+    log.file.retainedFiles = 5 // keep five old logs around
+  }
+
 }

@@ -1,6 +1,7 @@
 package twitter.crawler.storages
 
 import twitter.crawler.common.storageProperties
+import com.codahale.logula.Logging
 import scala.collection.JavaConversions._
 import sys.ShutdownHookThread
 import org.neo4j.scala.{DatabaseService, EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
@@ -10,8 +11,9 @@ import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
 import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node}
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider {
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging{
   val USER_ID = "twId"
+  val MESSAGE_ID = "messageId"
 
   override def neo4jStoreDir = storageProperties("graph.storage")
 
@@ -90,15 +92,14 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
 
   private def saveEvent(ttype: String, rel: Relationship, id: Long, when: Date) = {
     rel("ts") = when.getTime
-    rel("messageId") = id
+    rel(MESSAGE_ID) = id
 
     eventsIndex +=(rel, "type", ttype)
-    eventsIndex +=(rel, "messageId", new ValueContext(id) indexNumeric())
+    eventsIndex +=(rel, MESSAGE_ID, new ValueContext(id) indexNumeric())
     eventsIndex +=(rel, "ts", new ValueContext(when getTime) indexNumeric())
   }
 
-  val QUERY = "type:%s AND messageId:%d"
-
+  val QUERY = "type:%s AND "+MESSAGE_ID+" :%d"
   private def isNew(ttype: String, messageId: Long): Boolean = {
     val hits = eventsIndex.query(QUERY.format(ttype, messageId))
     val result = hits.getSingle
@@ -117,7 +118,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           saveEvent("RT", rel, thisMessageId, when)
           rel("baseMessageId") = baseMessageId
           eventsIndex +=(rel, "baseMessage", new ValueContext(baseMessageId) indexNumeric())
-          println("Save Retweet user: " + fromU.getScreenName + " message: " + thisMessageId)
+          log.info("Save Retweet by user: %s from message %d in %d", fromU.getScreenName, baseMessageId, thisMessageId)
       }
     }
   }
@@ -135,7 +136,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           }
           val rel: Relationship = fromN --> "MENTION" --> toN <()
           saveEvent("MENTION", rel, messageId, when)
-          println("Save mention user " + fromU.getScreenName + " mention " + toScreenName)
+          log.info("Save mention: user %s mentions %s in %d",fromU.getScreenName, toScreenName, messageId)
       }
     }
 
@@ -148,12 +149,10 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val urlNode = getOrCreateUniqueEntity(realUrl)
           val userNode = indexUserInfo(user)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
-
           rel("showedUrl") = showedUrl
           eventsIndex +=(rel, "showedUrl", showedUrl)
-
           saveEvent("POSTED", rel, messageId, when)
-          println("Save url user "+user.getScreenName+" posted "+realUrl)
+          log.info("Save url: user %s posted %s in %d ",user.getScreenName, realUrl, messageId)
       }
     }
   }
@@ -166,8 +165,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val urlNode = getOrCreateUniqueEntity(realUrl)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
           saveEvent("POSTED", rel, messageId, when)
-          println("Save refinement url user " + username + " posted " + realUrl)
-
+          log.info("Save refinement url: user %s posted %s in %d", username, realUrl, messageId)
       }
     }
   }
@@ -180,7 +178,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val tagNode = getOrCreateUniqueEntity(hashTag)
           val rel: Relationship = userNode --> "TAGGED" --> tagNode <()
           saveEvent("TAGGED", rel, messageId, when)
-          println("Save Hash tag user " + user.getScreenName + " posted " + hashTag)
+          log.info("Save Hash tag: user %s posted %s in %d", user.getScreenName, hashTag, messageId)
       }
     }
   }
@@ -193,8 +191,8 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           friend: Long =>
             val toN = getOrCreateUniqueUser(friend)
             fromN --> "READS" --> toN
+            log.info("Save friendship: user %d reads %d", fromN, toN)
         }
-        println("Save friendship")
     }
   }
 

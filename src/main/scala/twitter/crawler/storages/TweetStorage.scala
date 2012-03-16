@@ -14,6 +14,7 @@ import twitter.crawler.common.storageProperties
 import org.apache.lucene.document.DateTools.{Resolution, dateToString}
 
 object TweetStorage extends Actor {
+  val MESSAGE_ID = "messageId"
 	val analyzer: Analyzer = new StandardAnalyzer(Version.LUCENE_CURRENT)
   val filedir = new java.io.File(storageProperties("lucene.storage"))
   val directory = new NIOFSDirectory(filedir)
@@ -43,7 +44,7 @@ object TweetStorage extends Actor {
 
   def indexed(id: Long): Boolean = {
     reader = IndexReader.openIfChanged(reader, true)
-    val query = new TermQuery(new Term("messageId", id.toString))
+    val query = new TermQuery(new Term(MESSAGE_ID, id.toString))
     val searcher = new IndexSearcher(reader)
     searcher.search(query, 1).totalHits > 0
   }
@@ -56,7 +57,7 @@ object TweetStorage extends Actor {
 
   def toDocument(id: Long, date: Date, content: String): Document={
     val doc = new Document
-    doc.add(new Field("messageId", id.toString, Field.Store.YES, Field.Index.NOT_ANALYZED))
+    doc.add(new Field(MESSAGE_ID, id.toString, Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("creationDate", dateToString(date, Resolution.SECOND) , Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("content", content, Field.Store.NO, Field.Index.ANALYZED))
     return doc

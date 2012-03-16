@@ -1,5 +1,6 @@
 package twitter.crawler.utils
 
+import com.codahale.logula.Logging
 import dispatch.thread.Safety
 import dispatch.{Http, Request, url}
 import dispatch.XhtmlParsing._
@@ -10,7 +11,7 @@ import io.Source
 import actors.Actor
 import java.util.{Calendar, Date}
 
-object UrlEnlarger {
+object UrlEnlarger extends Logging {
   val DEFAULT_FILE = "src/main/resources/services.properties"
   val HTTP_PREFIX = "http[s]{0,1}://"
   val h = new Http with Safety {
@@ -58,20 +59,22 @@ object UrlEnlarger {
   }
 
   def clean = {
+    log.info("Strart clean url cache current size: %d recs", urlCacheExpiration.size)
     println("Clean short urls cache")
     urlCacheExpiration.retain((url, ts) => fresh(url, ts))
     urlCache.retain((url, _) => urlCacheExpiration contains url)
+    log.info("End clean url cache current size: %d recs", urlCacheExpiration.size)
   }
 
 
   def enlarge(url: String): String = {
     if (shorten(url)) {
       if (urlCache.contains(url) && fresh(url, urlCacheExpiration(url))) {
-        println("Cache hits")
+        log.info("Url in cache: %s", url)
         urlCache(url)
       }
       else {
-        println("New url")
+        log.info("New url: %s", url)
         var isOk: Boolean = true
 
         val eUrl: String = h x (enlargeRequest <<? Map("url" -> url) <> {
@@ -79,12 +82,13 @@ object UrlEnlarger {
         }) {
           case (200, _, _, out) => out()
           case (s, _, _, out) =>
-            println("Bad status: " + s)
+            log.info("Bad status: %d", s)
             isOk = false
             url
         }
 
         if (isOk) {
+          log.info("Url %s extracted to %s", url, eUrl)
           urlCache(url) = eUrl
 
           val calendar = Calendar.getInstance()
