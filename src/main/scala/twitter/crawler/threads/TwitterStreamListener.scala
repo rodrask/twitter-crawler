@@ -1,16 +1,15 @@
-package twitter.crawler.storm.bolts
+package twitter.crawler.storm
 
-import backtype.storm.tuple.Tuple
-import storm.scala.dsl.StormBolt
+import twitter4j.StatusDeletionNotice
+import twitter4j.StatusListener
 import twitter4j.Status
-import twitter.crawler.storages.TweetStorage
 import twitter.crawler.storages.GraphStorage._
-import twitter.crawler.common.extractURL
-import twitter.crawler.utils.UrlEnlarger.enlarge
-import twitter.crawler.storages.FutureTasksStorage
+import twitter.crawler.storages.{FutureTasksStorage, TweetStorage}
+import twitter.crawler.common._
+import twitter.crawler.utils.UrlEnlarger._
 
-class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 
+class TwitterStreamListener extends StatusListener {
   def performRetweet(status: Status): Unit = {
     if (status.isRetweet) {
       val rStatus = status.getRetweetedStatus
@@ -66,16 +65,24 @@ class TwitterBoltCommon extends StormBolt(outputFields = List()) {
 
   val hooks: List[Status => Unit] = List(performRetweet(_), performMentions(_), performUrls(_), performHashTags(_))
 
-  def execute(t: Tuple) =
-    t matchSeq {
-      case Seq(status: Status) =>
-        TweetStorage ! ('index, status)
-        hooks foreach {
-          h => h(status)
-        }
-        t ack
+  override def onStatus(status: Status) = {
+    TweetStorage ! ('index, status)
+    hooks foreach {
+      h => h(status)
     }
+  }
 
-  override def cleanup(): scala.Unit = {
+  override def onDeletionNotice(statusDeletionNotice: StatusDeletionNotice) {
+  }
+
+  override def onTrackLimitationNotice(numberOfLimitedStatuses: Int) {
+    println("Got track limitation notice:" + numberOfLimitedStatuses);
+  }
+
+  override def onScrubGeo(userId: Long, upToStatusId: Long) {
+  }
+
+  override def onException(ex: Exception) {
+    ex.printStackTrace();
   }
 }

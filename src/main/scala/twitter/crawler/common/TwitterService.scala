@@ -2,7 +2,7 @@ package twitter.crawler.common
 
 import twitter4j.auth.{OAuthSupport, AccessToken}
 import scala.collection.mutable.Map
-import twitter4j.{Twitter, TwitterFactory, TwitterStreamFactory}
+import twitter4j.{TwitterStream, Twitter, TwitterFactory, TwitterStreamFactory}
 
 object TwitterService {
   val accountProperties = loadConf("src/main/resources/accounts.properties")
@@ -12,6 +12,11 @@ object TwitterService {
   val streamFactory = new TwitterStreamFactory()
   val restFactory = new TwitterFactory();
 
+  def newStreamInstance(prefix: String=""): TwitterStream={
+    val result = streamFactory.getInstance
+    authorize(result, prefix)
+    result
+  }
   def newRestInstance(prefix: String=""): Twitter =
   {
     val result = restFactory.getInstance

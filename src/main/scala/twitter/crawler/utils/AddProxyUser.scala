@@ -2,7 +2,6 @@ package twitter.crawler.utils
 
 import twitter4j.Twitter
 import twitter.crawler.common.TwitterService
-import twitter.crawler.common.commonProperties
 import java.io.FileWriter
 
 object AddProxyUser extends App {

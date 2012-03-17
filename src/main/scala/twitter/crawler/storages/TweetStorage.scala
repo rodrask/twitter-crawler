@@ -12,64 +12,75 @@ import org.apache.lucene.search._
 import org.apache.lucene.document._
 import twitter.crawler.common.storageProperties
 import org.apache.lucene.document.DateTools.{Resolution, dateToString}
+import com.codahale.logula.Logging
 
-object TweetStorage extends Actor {
+object TweetStorage extends Actor with Logging {
   val MESSAGE_ID = "messageId"
-	val analyzer: Analyzer = new StandardAnalyzer(Version.LUCENE_CURRENT)
+  val analyzer: Analyzer = new StandardAnalyzer(Version.LUCENE_CURRENT)
   val filedir = new java.io.File(storageProperties("lucene.storage"))
   val directory = new NIOFSDirectory(filedir)
 
-  if (!filedir.exists) { filedir.mkdir }
-
-  val conf = new IndexWriterConfig(Version.LUCENE_35, analyzer);
+  def conf = new IndexWriterConfig(Version.LUCENE_35, analyzer);
   conf setOpenMode (IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
 
-  var reader = IndexReader.open(directory, true)
-
+  def init = {
+    val conf = new IndexWriterConfig(Version.LUCENE_35, analyzer);
+    conf setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+    val writer = new IndexWriter(directory, conf)
+    val doc = new Document
+    doc.add(new Field("root", "root", Field.Store.YES, Field.Index.NOT_ANALYZED))
+    writer.addDocument(doc)
+    writer.close()
+  }
 
   def saveTweet(status: Status): Unit = {
-    if (! indexed(status.getId))
-    {
-      val doc = toDocument(status.getId, status.getCreatedAt, status.getUser.getScreenName+" "+status.getText)
+    log.info("Save tweet %d", status.getId)
+    if (!indexed(status.getId)) {
+      val doc = toDocument(status.getId, status.getCreatedAt, status.getUser.getScreenName + " " + status.getText)
       index(doc)
     }
   }
 
   def saveTweet(status: Tweet): Unit = {
     {
-      val doc = toDocument(status.getId, status.getCreatedAt, status.getFromUser+" "+status.getText)
+      log.info("Save tweet %d", status.getId)
+      val doc = toDocument(status.getId, status.getCreatedAt, status.getFromUser + " " + status.getText)
       index(doc)
     }
   }
 
   def indexed(id: Long): Boolean = {
-    reader = IndexReader.openIfChanged(reader, true)
+    val reader = IndexReader.open(directory, true)
     val query = new TermQuery(new Term(MESSAGE_ID, id.toString))
     val searcher = new IndexSearcher(reader)
-    searcher.search(query, 1).totalHits > 0
+    val h = searcher.search(query, 1).totalHits
+    log.info("Total hits: %d", h)
+    reader.close()
+    h > 0
   }
 
-  def index(doc: Document)={
-    val writer = new IndexWriter(directory, conf)
+  val writer = new IndexWriter(directory, conf)
+  def index(doc: Document) = {
+    log.info("indexing %s", doc.get(MESSAGE_ID))
     writer.addDocument(doc)
-    writer close
+    writer commit()
   }
 
-  def toDocument(id: Long, date: Date, content: String): Document={
+  def toDocument(id: Long, date: Date, content: String): Document = {
     val doc = new Document
     doc.add(new Field(MESSAGE_ID, id.toString, Field.Store.YES, Field.Index.NOT_ANALYZED))
-    doc.add(new Field("creationDate", dateToString(date, Resolution.SECOND) , Field.Store.YES, Field.Index.NOT_ANALYZED))
+    doc.add(new Field("creationDate", dateToString(date, Resolution.SECOND), Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("content", content, Field.Store.NO, Field.Index.ANALYZED))
     return doc
 
   }
 
-  def search(qury: String): Seq[Document]={
+  def search(qury: String): Seq[Document] = {
     return List[Document]()
   }
 
 
-def act() {
+  def act() {
     loopWhile(true) {
       react {
         case ('index, status: Status) =>
