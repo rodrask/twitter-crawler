@@ -2,7 +2,6 @@ package twitter.crawler.creation.socialgraph
 
 import twitter.crawler.common._
 import org.neo4j.graphdb.Node
-import backtype.storm.utils.Utils
 import twitter4j.{TwitterException, User, ResponseList, Twitter}
 import collection.mutable.ListBuffer
 import twitter.crawler.storages.{GraphStorage}
@@ -31,13 +30,13 @@ object SocialGraphFullUserInfo extends App {
       case e: TwitterException =>
         if (e.exceededRateLimitation()) {
           var sleepSeconds: Long = 30 * 60
-          Utils.sleep(sleepSeconds * 1000)
+          Thread.sleep(sleepSeconds * 1000)
         } else {
-          Utils.sleep(10 * 1000)
+          Thread.sleep(10 * 1000)
         }
       case e: Exception =>
         Console.println("Some excepton...sleep on 10 seconds")
-        Utils.sleep(10 * 1000)
+        Thread.sleep(10 * 1000)
     }
   }
 

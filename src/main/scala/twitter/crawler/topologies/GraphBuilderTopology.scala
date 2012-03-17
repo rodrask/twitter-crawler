@@ -1,13 +1,6 @@
 package twitter.crawler.topologies
 
-import backtype.storm.topology.TopologyBuilder
-import backtype.storm.{Config, LocalCluster}
-import twitter.crawler.storm.bolts.{UrlBolt, RetweetBolt, TwitterBoltCommon}
-import twitter.crawler.utils.UrlEnlarger
-import twitter.crawler.storages.{TweetStorage, FutureTasksStorage, GraphStorage}
-import twitter.crawler.storm.spouts._
-import org.neo4j.cypher.symbols.ScalarType
-import twitter4j.{TwitterStreamFactory, TwitterStream}
+import twitter.crawler.storages.{TweetStorage, FutureTasksStorage}
 import twitter.crawler.storm.TwitterStreamListener
 import twitter.crawler.common.TwitterService
 import twitter.crawler.threads.{SearchThread, RetweetsThread}
