@@ -189,8 +189,9 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def saveFriendship(from: Long, to: Seq[Long]) = {
+  def saveFriendship(from: Long, to: Seq[Long], countUser: Int): Int = {
     val fromN = getOrCreateUniqueUser(from)
+    var newCountUser = countUser
     withTx {
       implicit ds: DatabaseService =>
         to foreach {
@@ -198,8 +199,10 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
             val toN = getOrCreateUniqueUser(friend)
             fromN --> "READS" --> toN
             log.info("Save friendship: user %d reads %d", fromN.getId, toN.getId)
+            newCountUser += 1
         }
     }
+    newCountUser
   }
 
   /*
