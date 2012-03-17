@@ -12,7 +12,7 @@ import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
 import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node}
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging{
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
 
@@ -66,27 +66,31 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   }
 
   def indexUserInfo(user: User): Node = {
-    val userNode = getOrCreateUniqueUser(user.getId)
+    var userNode: Node = getOrCreateUniqueUser(user.getId)
     if (userNode("i").isEmpty) {
-      userNode("name") = user.getScreenName
-      userNode("creationDate") = user.getCreatedAt.getTime
+      withTx {
+        implicit ds: DatabaseService =>
+          userNode("name") = user.getScreenName
+          userNode("creationDate") = user.getCreatedAt.getTime
 
-      val location = if (user.getLocation == null) "" else user.getLocation
-      val lang = if (user.getLang == null) "" else user.getLang
-      val description = if (user.getDescription == null) "" else user.getDescription
+          val location = if (user.getLocation == null) "" else user.getLocation
+          val lang = if (user.getLang == null) "" else user.getLang
+          val description = if (user.getDescription == null) "" else user.getDescription
 
-      userNode("location") = location
-      userNode("lang") = lang
-      userNode("description") = description
-      userNode("followersCount") = user.getFollowersCount
-      userNode("friendsCount") = user.getFriendsCount
-      userNode("statusesCount") = user.getStatusesCount
-      userNode("isProtected") = user.isProtected
+          userNode("location") = location
+          userNode("lang") = lang
+          userNode("description") = description
+          userNode("followersCount") = user.getFollowersCount
+          userNode("friendsCount") = user.getFriendsCount
+          userNode("statusesCount") = user.getStatusesCount
+          userNode("isProtected") = user.isProtected
 
-      userNode("i") = 1
+          userNode("i") = 1
 
-      userIndex +=(userNode, "name", user.getScreenName)
-      userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
+          userIndex +=(userNode, "name", user.getScreenName)
+          userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
+          log.info("Save user's full info: neo_id = %d twId = %d   screenName = %s", userNode.getId, userNode.getProperty(USER_ID), userNode.getProperty("name"))
+      }
     }
     userNode
   }
@@ -100,7 +104,8 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     eventsIndex +=(rel, "ts", new ValueContext(when getTime) indexNumeric())
   }
 
-  val QUERY = "type:%s AND "+MESSAGE_ID+" :%d"
+  val QUERY = "type:%s AND " + MESSAGE_ID + " :%d"
+
   private def isNew(ttype: String, messageId: Long): Boolean = {
     val hits = eventsIndex.query(QUERY.format(ttype, messageId))
     val result = hits.getSingle
@@ -137,7 +142,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           }
           val rel: Relationship = fromN --> "MENTION" --> toN <()
           saveEvent("MENTION", rel, messageId, when)
-          log.info("Save mention: user %s mentions %s in %d",fromU.getScreenName, toScreenName, messageId)
+          log.info("Save mention: user %s mentions %s in %d", fromU.getScreenName, toScreenName, messageId)
       }
     }
 
@@ -153,12 +158,12 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           rel("showedUrl") = showedUrl
           eventsIndex +=(rel, "showedUrl", showedUrl)
           saveEvent("POSTED", rel, messageId, when)
-          log.info("Save url: user %s posted %s in %d ",user.getScreenName, realUrl, messageId)
+          log.info("Save url: user %s posted %s in %d ", user.getScreenName, realUrl, messageId)
       }
     }
   }
 
-  def saveUrlFromSearch(username: String, realUrl:String, messageId: Long, when: Date) = {
+  def saveUrlFromSearch(username: String, realUrl: String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -192,7 +197,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           friend: Long =>
             val toN = getOrCreateUniqueUser(friend)
             fromN --> "READS" --> toN
-            log.info("Save friendship: user %d reads %d", fromN, toN)
+            log.info("Save friendship: user %d reads %d", fromN.getId, toN.getId)
         }
     }
   }
@@ -205,11 +210,11 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
-  def foreverAloneUsers(): Seq[Node]={
+  def foreverAloneUsers(): Seq[Node] = {
     Nil
   }
 
-  def partialUsers(): Seq[Node]={
+  def partialUsers(): Seq[Node] = {
     Nil
   }
 
