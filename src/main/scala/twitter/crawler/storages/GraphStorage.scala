@@ -15,6 +15,7 @@ import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
+  val UNKNOWN = "unknown"
 
   override def neo4jStoreDir = storageProperties("graph.storage")
 
@@ -65,6 +66,21 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     factory.getOrCreate(USER_ID, new ValueContext(userId))
   }
 
+  def indexUserInfo(nodes: List[Node]) = {
+    withTx {
+      implicit ds: DatabaseService =>
+        nodes foreach {
+          userNode =>
+            if (userNode("i").isEmpty) {
+              userNode("name") = UNKNOWN
+              userNode("i") = 1
+              userIndex +=(userNode, "name", UNKNOWN)
+              log.info("Save user's full info: neo_id = %d twId = %d   screenName = %s", userNode.getId, userNode.getProperty(USER_ID), userNode.getProperty("name"))
+            }
+        }
+    }
+  }
+
   def indexUserInfo(user: User): Node = {
     var userNode: Node = getOrCreateUniqueUser(user.getId)
     if (userNode("i").isEmpty) {
@@ -76,6 +92,11 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           val location = if (user.getLocation == null) "" else user.getLocation
           val lang = if (user.getLang == null) "" else user.getLang
           val description = if (user.getDescription == null) "" else user.getDescription
+          val profileBackgroundColor = if (user.getProfileBackgroundColor == null) "" else user.getProfileBackgroundColor
+          val profileTextColor = if (user.getProfileTextColor == null) "" else user.getProfileTextColor
+          val profileLinkColor = if (user.getProfileLinkColor == null) "" else user.getProfileLinkColor
+          val profileSidebarFillColor = if (user.getProfileSidebarFillColor == null) "" else user.getProfileSidebarFillColor
+          val profileSidebarBorderColor = if (user.getProfileSidebarBorderColor == null) "" else user.getProfileSidebarBorderColor
 
           userNode("location") = location
           userNode("lang") = lang
@@ -84,6 +105,14 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           userNode("friendsCount") = user.getFriendsCount
           userNode("statusesCount") = user.getStatusesCount
           userNode("isProtected") = user.isProtected
+          userNode("favouritesCount") = user.getFavouritesCount
+          userNode("profileBackgroundColor") = profileBackgroundColor
+          userNode("profileTextColor") = profileTextColor
+          userNode("profileLinkColor") = profileLinkColor
+          userNode("profileSidebarFillColor") = profileSidebarFillColor
+          userNode("profileSidebarBorderColor") = profileSidebarBorderColor
+          userNode("profileUseBackgroundImage") = user.isProfileUseBackgroundImage
+
 
           userNode("i") = 1
 

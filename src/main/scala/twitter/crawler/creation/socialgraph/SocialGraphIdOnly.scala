@@ -10,7 +10,7 @@ import scala.util.control.Breaks._
 
 object SocialGraphIdOnly extends App {
   Console.println("Start process create social graph by id user...")
-  val creationUser: Int = 1000000
+  val minCreationUser: Int = 1000000
   val usernames = loadNames("src\\main\\resources\\twi_top100.txt").toArray
   var twitterRest: Twitter = TwitterService.restFactory.getInstance()
   TwitterService.authorize(twitterRest)
@@ -26,7 +26,7 @@ object SocialGraphIdOnly extends App {
   val rand: Random = new Random(System.currentTimeMillis())
   breakable {
     while (true) {
-      if (countUser > creationUser) {
+      if (countUser > minCreationUser) {
         break;
       }
       val nodes: List[Node] = GraphStorage.batchNodesWithoutFriends(100)
