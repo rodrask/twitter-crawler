@@ -205,8 +205,13 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
-  def foreverAloneUsers(): Seq[Node]={
-    Nil
+  def foreverAloneUsers()={
+    val r= engine.execute(
+      """
+      start user=node:users("name:*")
+      match user-[:TAGGED]->url
+      return url, count(user) order by count(user)""")
+    println(r.dumpToString)
   }
 
   def partialUsers(): Seq[Node]={
