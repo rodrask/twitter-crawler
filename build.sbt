@@ -13,10 +13,5 @@ libraryDependencies ++= Seq(
 	"org.twitter4j" % "twitter4j-core" % "2.2.5",
 	"org.twitter4j" % "twitter4j-stream" % "2.2.5",
 	"net.databinder" %% "dispatch-http" % "0.8.8",
-	"com.codahale" %% "logula" % "2.1.3")
-
-unmanagedJars in Compile <++= baseDirectory map { base =>
-	val baseDirectories = (base / "lib") +++ (base / "neo4j-libs") +++ (base / "storm-libs")
-	val customJars = (baseDirectories ** "*.jar")
-	customJars.classpath
-}
+	"com.codahale" %% "logula" % "2.1.3",
+	"org.neo4j" % "neo4j" % "1.7.M01")

@@ -12,9 +12,10 @@ import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
 import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node}
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging{
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
+  val UNKNOWN = "unknown"
 
   override def neo4jStoreDir = storageProperties("graph.storage")
 
@@ -65,28 +66,60 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     factory.getOrCreate(USER_ID, new ValueContext(userId))
   }
 
+  def indexUserInfo(nodes: List[Node]) = {
+    withTx {
+      implicit ds: DatabaseService =>
+        nodes foreach {
+          userNode =>
+            if (userNode("i").isEmpty) {
+              userNode("name") = UNKNOWN
+              userNode("i") = 1
+              userIndex +=(userNode, "name", UNKNOWN)
+              log.info("Save user's full info: neo_id = %d twId = %d   screenName = %s", userNode.getId, userNode.getProperty(USER_ID), userNode.getProperty("name"))
+            }
+        }
+    }
+  }
+
   def indexUserInfo(user: User): Node = {
-    val userNode = getOrCreateUniqueUser(user.getId)
+    var userNode: Node = getOrCreateUniqueUser(user.getId)
     if (userNode("i").isEmpty) {
-      userNode("name") = user.getScreenName
-      userNode("creationDate") = user.getCreatedAt.getTime
+      withTx {
+        implicit ds: DatabaseService =>
+          userNode("name") = user.getScreenName
+          userNode("creationDate") = user.getCreatedAt.getTime
 
-      val location = if (user.getLocation == null) "" else user.getLocation
-      val lang = if (user.getLang == null) "" else user.getLang
-      val description = if (user.getDescription == null) "" else user.getDescription
+          val location = if (user.getLocation == null) "" else user.getLocation
+          val lang = if (user.getLang == null) "" else user.getLang
+          val description = if (user.getDescription == null) "" else user.getDescription
+          val profileBackgroundColor = if (user.getProfileBackgroundColor == null) "" else user.getProfileBackgroundColor
+          val profileTextColor = if (user.getProfileTextColor == null) "" else user.getProfileTextColor
+          val profileLinkColor = if (user.getProfileLinkColor == null) "" else user.getProfileLinkColor
+          val profileSidebarFillColor = if (user.getProfileSidebarFillColor == null) "" else user.getProfileSidebarFillColor
+          val profileSidebarBorderColor = if (user.getProfileSidebarBorderColor == null) "" else user.getProfileSidebarBorderColor
 
-      userNode("location") = location
-      userNode("lang") = lang
-      userNode("description") = description
-      userNode("followersCount") = user.getFollowersCount
-      userNode("friendsCount") = user.getFriendsCount
-      userNode("statusesCount") = user.getStatusesCount
-      userNode("isProtected") = user.isProtected
+          userNode("location") = location
+          userNode("lang") = lang
+          userNode("description") = description
+          userNode("followersCount") = user.getFollowersCount
+          userNode("friendsCount") = user.getFriendsCount
+          userNode("statusesCount") = user.getStatusesCount
+          userNode("isProtected") = user.isProtected
+          userNode("favouritesCount") = user.getFavouritesCount
+          userNode("profileBackgroundColor") = profileBackgroundColor
+          userNode("profileTextColor") = profileTextColor
+          userNode("profileLinkColor") = profileLinkColor
+          userNode("profileSidebarFillColor") = profileSidebarFillColor
+          userNode("profileSidebarBorderColor") = profileSidebarBorderColor
+          userNode("profileUseBackgroundImage") = user.isProfileUseBackgroundImage
 
-      userNode("i") = 1
 
-      userIndex +=(userNode, "name", user.getScreenName)
-      userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
+          userNode("i") = 1
+
+          userIndex +=(userNode, "name", user.getScreenName)
+          userIndex +=(userNode, "creationDate", new ValueContext(user.getCreatedAt.getTime) indexNumeric)
+          log.info("Save user's full info: neo_id = %d twId = %d   screenName = %s", userNode.getId, userNode.getProperty(USER_ID), userNode.getProperty("name"))
+      }
     }
     userNode
   }
@@ -100,7 +133,8 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     eventsIndex +=(rel, "ts", new ValueContext(when getTime) indexNumeric())
   }
 
-  val QUERY = "type:%s AND "+MESSAGE_ID+" :%d"
+  val QUERY = "type:%s AND " + MESSAGE_ID + " :%d"
+
   private def isNew(ttype: String, messageId: Long): Boolean = {
     val hits = eventsIndex.query(QUERY.format(ttype, messageId))
     val result = hits.getSingle
@@ -137,7 +171,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           }
           val rel: Relationship = fromN --> "MENTION" --> toN <()
           saveEvent("MENTION", rel, messageId, when)
-          log.info("Save mention: user %s mentions %s in %d",fromU.getScreenName, toScreenName, messageId)
+          log.info("Save mention: user %s mentions %s in %d", fromU.getScreenName, toScreenName, messageId)
       }
     }
 
@@ -153,12 +187,12 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           rel("showedUrl") = showedUrl
           eventsIndex +=(rel, "showedUrl", showedUrl)
           saveEvent("POSTED", rel, messageId, when)
-          log.info("Save url: user %s posted %s in %d ",user.getScreenName, realUrl, messageId)
+          log.info("Save url: user %s posted %s in %d ", user.getScreenName, realUrl, messageId)
       }
     }
   }
 
-  def saveUrlFromSearch(username: String, realUrl:String, messageId: Long, when: Date) = {
+  def saveUrlFromSearch(username: String, realUrl: String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -184,17 +218,20 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def saveFriendship(from: Long, to: Seq[Long]) = {
+  def saveFriendship(from: Long, to: Seq[Long], countUser: Int): Int = {
     val fromN = getOrCreateUniqueUser(from)
+    var newCountUser = countUser
     withTx {
       implicit ds: DatabaseService =>
         to foreach {
           friend: Long =>
             val toN = getOrCreateUniqueUser(friend)
             fromN --> "READS" --> toN
-            log.info("Save friendship: user %d reads %d", fromN, toN)
+            log.info("Save friendship: user %d reads %d", fromN.getId, toN.getId)
+            newCountUser += 1
         }
     }
+    newCountUser
   }
 
   /*
@@ -205,6 +242,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
+<<<<<<< HEAD
   def foreverAloneUsers()={
     val r= engine.execute(
       """
@@ -212,9 +250,13 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
       match user-[:TAGGED]->url
       return url, count(user) order by count(user)""")
     println(r.dumpToString)
+=======
+  def foreverAloneUsers(): Seq[Node] = {
+    Nil
+>>>>>>> ebbc8062618faccebd07bd2806bcf18df20705a9
   }
 
-  def partialUsers(): Seq[Node]={
+  def partialUsers(): Seq[Node] = {
     Nil
   }
 
