@@ -95,7 +95,7 @@ object UrlEnlarger extends Logging {
           calendar.add(Calendar.HOUR, 24)
           urlCacheExpiration(url) = calendar.getTime
 
-          if (urlCache.size > 30000)
+          if (urlCache.size > 1000)
             clean
         }
         eUrl

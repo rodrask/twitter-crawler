@@ -7,9 +7,10 @@ import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.{FutureTasksStorage, TweetStorage}
 import twitter.crawler.common._
 import twitter.crawler.utils.UrlEnlarger._
+import com.codahale.logula.Logging
 
 
-class TwitterStreamListener extends StatusListener {
+class TwitterStreamListener extends StatusListener with Logging {
   def performRetweet(status: Status): Unit = {
     if (status.isRetweet) {
       val rStatus = status.getRetweetedStatus
@@ -76,13 +77,14 @@ class TwitterStreamListener extends StatusListener {
   }
 
   override def onTrackLimitationNotice(numberOfLimitedStatuses: Int) {
-    println("Got track limitation notice:" + numberOfLimitedStatuses);
+    log.error("Got track limitation notice: %d", numberOfLimitedStatuses)
   }
 
   override def onScrubGeo(userId: Long, upToStatusId: Long) {
   }
 
   override def onException(ex: Exception) {
+    log.error(ex.getMessage)
     ex.printStackTrace();
   }
 }

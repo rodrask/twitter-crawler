@@ -13,6 +13,7 @@ import org.apache.lucene.document._
 import twitter.crawler.common.storageProperties
 import org.apache.lucene.document.DateTools.{Resolution, dateToString}
 import com.codahale.logula.Logging
+import org.apache.lucene.document.Field.TermVector
 
 object TweetStorage extends Actor with Logging {
   val MESSAGE_ID = "messageId"
@@ -22,6 +23,8 @@ object TweetStorage extends Actor with Logging {
 
   def conf = new IndexWriterConfig(Version.LUCENE_35, analyzer);
   conf setOpenMode (IndexWriterConfig.OpenMode.CREATE_OR_APPEND)
+  conf.setMaxBufferedDocs(3000)
+  val writer = new IndexWriter(directory, conf)
 
   def init = {
     val conf = new IndexWriterConfig(Version.LUCENE_35, analyzer);
@@ -34,7 +37,6 @@ object TweetStorage extends Actor with Logging {
   }
 
   def saveTweet(status: Status): Unit = {
-    log.info("Save tweet %d", status.getId)
     if (!indexed(status.getId)) {
       val doc = toDocument(status.getId, status.getCreatedAt, status.getUser.getScreenName + " " + status.getText)
       index(doc)
@@ -43,39 +45,37 @@ object TweetStorage extends Actor with Logging {
 
   def saveTweet(status: Tweet): Unit = {
     {
-      log.info("Save tweet %d", status.getId)
       val doc = toDocument(status.getId, status.getCreatedAt, status.getFromUser + " " + status.getText)
       index(doc)
     }
   }
 
   def indexed(id: Long): Boolean = {
-    val reader = IndexReader.open(directory, true)
+    val reader = IndexReader.open(writer, false)
     val query = new TermQuery(new Term(MESSAGE_ID, id.toString))
     val searcher = new IndexSearcher(reader)
     val h = searcher.search(query, 1).totalHits
-    log.info("Total hits: %d", h)
     reader.close()
     h > 0
   }
 
-  val writer = new IndexWriter(directory, conf)
+
   def index(doc: Document) = {
-    log.info("indexing %s", doc.get(MESSAGE_ID))
     writer.addDocument(doc)
-    writer commit()
+    writer.commit
+
   }
 
   def toDocument(id: Long, date: Date, content: String): Document = {
     val doc = new Document
     doc.add(new Field(MESSAGE_ID, id.toString, Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("creationDate", dateToString(date, Resolution.SECOND), Field.Store.YES, Field.Index.NOT_ANALYZED))
-    doc.add(new Field("content", content, Field.Store.NO, Field.Index.ANALYZED))
+    doc.add(new Field("content", content, Field.Store.NO, Field.Index.ANALYZED, TermVector.YES))
     return doc
 
   }
 
-  def search(qury: String): Seq[Document] = {
+  def search(query: String): Seq[Document] = {
     return List[Document]()
   }
 

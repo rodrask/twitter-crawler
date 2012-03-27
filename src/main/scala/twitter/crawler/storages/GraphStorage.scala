@@ -242,16 +242,34 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
-  def foreverAloneUsers()={
+  def topFriendsUsers(topN: Int=100)={
     val r= engine.execute(
       """
       start user=node:users("name:*")
-      match user-[:TAGGED]->url
-      return url, count(user) order by count(user)""")
-    println(r.dumpToString)
+      match user-[r:READS]->f
+      return user.twId as id, user.name as user, count(f) as n order by count(f) desc limit {topN}
+      """, Map("topN"->topN))
+    r map (m => m("id"))
+  }
+  def usersWithUrls(from:Date, to: Date)={
+    val r= engine.execute(
+      """
+      start user=node:users(nodeType="USER")
+      match user-[r:POSTED]->url
+      where r.ts > {from} and r.ts < {to}
+      return user.name as user, collect(url) as urls
+      """, Map("from"->from.getTime, "to"->to.getTime))
+    r foreach {m => println(m)}
+  }
 
-  def partialUsers(): Seq[Node] = {
-    Nil
+  def aloneUsers() = {
+    val r = engine.execute(
+      """
+      start user=node:users(nodeType="USER")
+      match user-[:POSTED]->url
+      return user.name?, collect(url.name?)  LIMIT 100
+      """)
+    r
   }
 
   def batchNodesWithoutFriends(size: Int): List[Node] = {
