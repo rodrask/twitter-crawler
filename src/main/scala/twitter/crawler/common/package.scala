@@ -6,6 +6,7 @@ import scala.collection.JavaConversions._
 import scala.io.Source.fromFile
 import twitter4j.URLEntity
 import scala.util.matching.Regex
+import java.io.FileReader
 
 package object common {
 	val commonProperties = loadConf("src/main/resources/app.properties")
@@ -18,6 +19,11 @@ package object common {
 		file.close()
 		properties
 	}
+
+  def loadId(name: String): Seq[Long]={
+    val file = scala.io.Source.fromFile(name)
+    file.getLines().map(l => l.toLong).toList
+  }
 
   val twiRegex = new Regex("^http://twitter.com/(.*)$")
   def parseURL(address: String): String = {
@@ -39,9 +45,9 @@ package object common {
   }
 
   Logging.configure { log =>
-    log.level = Level.INFO
+    log.level = Level.WARN
     log.console.enabled = true
-    log.console.threshold = Level.INFO
+    log.console.threshold = Level.WARN
 
     log.file.enabled = true
     log.file.filename = storageProperties("logs.storage")

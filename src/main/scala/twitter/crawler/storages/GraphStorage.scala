@@ -10,9 +10,10 @@ import twitter4j.User
 import org.neo4j.graphdb.index.UniqueFactory
 import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
-import org.neo4j.graphdb.{DynamicRelationshipType, Direction, Relationship, Node}
+import org.neo4j.scala.TypedTraverser
+import org.neo4j.graphdb._
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging {
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with TypedTraverser with Logging {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
   val UNKNOWN = "unknown"
@@ -34,6 +35,10 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   ShutdownHookThread {
     println("shutdown hook")
     shutdown(ds)
+  }
+
+  def stop={
+   shutdown(ds) 
   }
 
   private def getOrCreateUniqueUser(username: String) = {
@@ -238,28 +243,34 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   * Ниже буду аналитические функции
 
   */
+  def makeQuery(query: String) = {
+    engine.execute(query)
+  }
 
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
-  def topFriendsUsers(topN: Int=100)={
-    val r= engine.execute(
+  def topFriendsUsers(topN: Int = 100) = {
+    val r = engine.execute(
       """
       start user=node:users("name:*")
       match user-[r:READS]->f
       return user.twId as id, user.name as user, count(f) as n order by count(f) desc limit {topN}
-      """, Map("topN"->topN))
+      """, Map("topN" -> topN))
     r map (m => m("id"))
   }
-  def usersWithUrls(from:Date, to: Date)={
-    val r= engine.execute(
+
+  def usersWithUrls(from: Date, to: Date) = {
+    val r = engine.execute(
       """
       start user=node:users(nodeType="USER")
       match user-[r:POSTED]->url
       where r.ts > {from} and r.ts < {to}
       return user.name as user, collect(url) as urls
-      """, Map("from"->from.getTime, "to"->to.getTime))
-    r foreach {m => println(m)}
+      """, Map("from" -> from.getTime, "to" -> to.getTime))
+    r foreach {
+      m => println(m)
+    }
   }
 
   def aloneUsers() = {

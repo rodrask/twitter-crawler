@@ -92,10 +92,9 @@ object UrlEnlarger extends Logging {
           urlCache(url) = eUrl
 
           val calendar = Calendar.getInstance()
-          calendar.add(Calendar.HOUR, 24)
+          calendar.add(Calendar.HOUR, 2)
           urlCacheExpiration(url) = calendar.getTime
-
-          if (urlCache.size > 1000)
+          if (urlCache.size > 3000)
             clean
         }
         eUrl

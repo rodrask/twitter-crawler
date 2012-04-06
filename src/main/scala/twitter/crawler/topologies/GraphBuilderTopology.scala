@@ -5,6 +5,7 @@ import twitter.crawler.storm.TwitterStreamListener
 import twitter.crawler.common.TwitterService
 import twitter.crawler.threads.{SearchThread, RetweetsThread}
 import twitter4j.FilterQuery
+import twitter.crawler.common.loadId
 
 object GraphBuilderTopology {
   def main(args: Array[String]) = {
@@ -16,8 +17,10 @@ object GraphBuilderTopology {
     SearchThread.start()
     val tStream = TwitterService.newStreamInstance()
     tStream.addListener(new TwitterStreamListener)
+    val ids = loadId("ids.txt")
     val filterQuery = new FilterQuery
-    tStream.sample()
+    filterQuery.follow(ids.toArray)
+    tStream.filter(filterQuery)
     
     Thread sleep  1000 * 60 * 60 * runTimeHours
 
