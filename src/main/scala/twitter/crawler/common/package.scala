@@ -7,10 +7,12 @@ import scala.io.Source.fromFile
 import twitter4j.URLEntity
 import scala.util.matching.Regex
 import java.io.FileReader
+import redis.clients.jedis.{JedisPoolConfig, JedisPool}
 
 package object common {
 	val commonProperties = loadConf("src/main/resources/app.properties")
   val storageProperties = loadConf("src/main/resources/storages.properties")
+  val redisPool: JedisPool = new JedisPool(new JedisPoolConfig(), "localhost", 6379)
 
 	def loadConf(name: String): Map[String, String] = {
 		val file = new java.io.FileInputStream(name)

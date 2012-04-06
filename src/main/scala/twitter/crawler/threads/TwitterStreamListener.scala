@@ -6,7 +6,7 @@ import twitter4j.Status
 import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.{FutureTasksStorage, TweetStorage}
 import twitter.crawler.common._
-import twitter.crawler.utils.UrlEnlarger._
+import twitter.crawler.utils.RedisUrlEnlarger._
 import com.codahale.logula.Logging
 
 

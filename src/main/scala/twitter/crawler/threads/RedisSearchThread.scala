@@ -1,22 +1,21 @@
 package twitter.crawler.threads
 
 import twitter.crawler.common.TwitterService
-import twitter.crawler.storages.FutureTasksStorage.UrlTask
 import scala.collection.JavaConversions._
 import twitter4j.{TwitterException, Tweet, QueryResult, Query}
 import com.codahale.logula.Logging
 import twitter.crawler.storages.GraphStorage._
-import twitter.crawler.storages.{RedisFutureStorage, TweetStorage, FutureTasksStorage}
+import twitter.crawler.storages.{RedisFutureStorage, TweetStorage}
 
 object RedisSearchThread extends Thread with Logging {
   val twitter = TwitterService.newRestInstance("search")
-  var sleepTime: Long = 1000 * 10
+  var sleepTime: Long = 1000 * 5
 
-  def buildQuery(task: UrlTask): Query = {
-    val query = new Query(task.url)
+  def buildQuery(url: String, lastMessage: Option[Long]): Query = {
+    val query = new Query(url)
     query.setRpp(100)
-    if (task.lastMessage.isDefined)
-      query.setSinceId(task.lastMessage.get)
+    if (lastMessage.isDefined)
+      query.setSinceId(lastMessage.get)
     query.setResultType(Query.RECENT)
     query
   }
@@ -24,25 +23,25 @@ object RedisSearchThread extends Thread with Logging {
   override def run() = {
     while (true) {
       Thread sleep sleepTime
-      (RedisFutureStorage !? 'get_url).asInstanceOf[Option[UrlTask]] match {
-        case Some(task) =>
-          try {
-            log.info("Search for: %s", task.url)
-            val result: QueryResult = twitter.search(buildQuery(task))
-            val tweets = result.getTweets
-            FutureTasksStorage !('put, task.url, result.getMaxId, task.interval)
-            tweets foreach {
-              status: Tweet =>
-                TweetStorage !('index, status)
-                saveUrlFromSearch(status.getFromUser, task.url, status.getId, status.getCreatedAt)
-            }
-          } catch {
-            case ex: TwitterException =>
-              println(ex.getErrorMessage)
-              if (ex.exceededRateLimitation)
-                sleepTime = 1000 * 60 * 10l
+      val urlTask = RedisFutureStorage.getUrlTask()
+      if (urlTask.isDefined) {
+        val (url, lastMessage) = urlTask.get
+        log.info("Search for: %s", url)
+        try {
+          val result: QueryResult = twitter.search(buildQuery(url, lastMessage))
+          val tweets = result.getTweets
+          RedisFutureStorage.updateLastMessageUrl(url, result.getMaxId)
+          tweets foreach {
+            status: Tweet =>
+              TweetStorage !('index, status)
+              saveUrlFromSearch(status.getFromUser, url, status.getId, status.getCreatedAt)
           }
-        case None =>
+        } catch {
+          case ex: TwitterException =>
+            log.error(ex.getErrorMessage)
+            if (ex.exceededRateLimitation)
+              sleepTime = 1000 * 60 * 10l
+        }
       }
     }
   }
