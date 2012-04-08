@@ -47,13 +47,13 @@ package object common {
   }
 
   Logging.configure { log =>
-    log.level = Level.WARN
+    log.level = Level.INFO
     log.console.enabled = true
-    log.console.threshold = Level.WARN
+    log.console.threshold = Level.INFO
 
     log.file.enabled = true
     log.file.filename = storageProperties("logs.storage")
-    log.file.maxSize = 100 * 1024 // KB
+    log.file.maxSize = 10 * 1024 // KB
     log.file.retainedFiles = 5 // keep five old logs around
   }
 

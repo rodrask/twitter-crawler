@@ -4,10 +4,10 @@ import twitter4j.StatusDeletionNotice
 import twitter4j.StatusListener
 import twitter4j.Status
 import twitter.crawler.storages.GraphStorage._
-import twitter.crawler.storages.{FutureTasksStorage, TweetStorage}
 import twitter.crawler.common._
 import twitter.crawler.utils.RedisUrlEnlarger._
 import com.codahale.logula.Logging
+import twitter.crawler.storages.{GraphStorage, RedisFutureStorage, TweetStorage}
 
 
 class TwitterStreamListener extends StatusListener with Logging {
@@ -15,8 +15,8 @@ class TwitterStreamListener extends StatusListener with Logging {
     if (status.isRetweet) {
       val rStatus = status.getRetweetedStatus
       TweetStorage ! ('index, rStatus)
-      saveRetweet(status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
-      FutureTasksStorage ! ('put, rStatus.getId)
+      GraphStorage ! ('save_rt, status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
+      RedisFutureStorage.putRTTask(rStatus.getId)
     }
   }
 
@@ -27,7 +27,7 @@ class TwitterStreamListener extends StatusListener with Logging {
     val id = status.getId
     mentions foreach {
       mention =>
-        saveMention(status.getUser, mention.getId, mention.getScreenName, id, status.getCreatedAt)
+        GraphStorage ! ('save_mention, status.getUser, mention.getId, mention.getScreenName, id, status.getCreatedAt)
     }
   }
 
@@ -44,11 +44,11 @@ class TwitterStreamListener extends StatusListener with Logging {
         }
         catch {
           case ex: Exception =>
-            println("Exception when enlarging url: "+ex.getMessage)
+            log.error("Exception when enlarging url: %s",ex.getMessage)
             enlargedUrl = extractedUrl
         }
-        saveUrl(status.getUser, extractedUrl, enlargedUrl, status.getId, status.getCreatedAt)
-        FutureTasksStorage ! ('put, enlargedUrl)
+        GraphStorage ! ('save_url, status.getUser, extractedUrl, enlargedUrl, status.getId, status.getCreatedAt)
+        RedisFutureStorage.putUrlTask(enlargedUrl)
     }
   }
 
@@ -60,7 +60,7 @@ class TwitterStreamListener extends StatusListener with Logging {
     val messageId = status.getId
     hashTags foreach {
       hashTag =>
-        saveHashTag(status.getUser, hashTag.getText, messageId, date)
+        GraphStorage ! ('save_hash, status.getUser, hashTag.getText, messageId, date)
     }
   }
 

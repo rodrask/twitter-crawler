@@ -4,7 +4,7 @@ import twitter.crawler.common.TwitterService
 import scala.collection.JavaConversions._
 import twitter4j.{TwitterException, Status, ResponseList, RateLimitStatus}
 import twitter.crawler.storages.GraphStorage._
-import twitter.crawler.storages.{RedisFutureStorage, FutureTasksStorage}
+import twitter.crawler.storages.{GraphStorage, RedisFutureStorage, FutureTasksStorage}
 
 object RedisRetweetsThread extends Thread {
   val twitter = TwitterService.newRestInstance("search")
@@ -34,7 +34,7 @@ object RedisRetweetsThread extends Thread {
           result foreach {
             status: Status =>
               val rStatus = status.getRetweetedStatus
-              saveRetweet(status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
+              GraphStorage ! ('save_rt, status.getUser, rStatus.getUser, status.getId, rStatus.getId, status.getCreatedAt)
           }
         } catch {
           case ex: TwitterException =>

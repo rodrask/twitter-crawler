@@ -5,8 +5,8 @@ import twitter.crawler.storages.FutureTasksStorage.UrlTask
 import scala.collection.JavaConversions._
 import twitter4j.{TwitterException, Tweet, QueryResult, Query}
 import com.codahale.logula.Logging
-import twitter.crawler.storages.{TweetStorage, FutureTasksStorage}
 import twitter.crawler.storages.GraphStorage._
+import twitter.crawler.storages.{GraphStorage, TweetStorage, FutureTasksStorage}
 
 object SearchThread extends Thread with Logging {
   val twitter = TwitterService.newRestInstance("search")
@@ -34,7 +34,7 @@ object SearchThread extends Thread with Logging {
             tweets foreach {
               status: Tweet =>
                 TweetStorage !('index, status)
-                saveUrlFromSearch(status.getFromUser, task.url, status.getId, status.getCreatedAt)
+                GraphStorage ! ('save_rf_url, status.getFromUser, task.url, status.getId, status.getCreatedAt)
             }
           } catch {
             case ex: TwitterException =>

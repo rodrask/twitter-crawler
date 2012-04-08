@@ -15,7 +15,7 @@ object Main extends App {
   """
   ) foreach {m => println(m("n"))}
 
-  	GraphStorage.stop
+  	GraphStorage.stopStorage
   	file.close()
   println("exit")
   0

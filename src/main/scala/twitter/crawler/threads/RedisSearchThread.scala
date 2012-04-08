@@ -5,11 +5,11 @@ import scala.collection.JavaConversions._
 import twitter4j.{TwitterException, Tweet, QueryResult, Query}
 import com.codahale.logula.Logging
 import twitter.crawler.storages.GraphStorage._
-import twitter.crawler.storages.{RedisFutureStorage, TweetStorage}
+import twitter.crawler.storages.{GraphStorage, RedisFutureStorage, TweetStorage}
 
 object RedisSearchThread extends Thread with Logging {
   val twitter = TwitterService.newRestInstance("search")
-  var sleepTime: Long = 1000 * 5
+  var sleepTime: Long = 1000 * 10
 
   def buildQuery(url: String, lastMessage: Option[Long]): Query = {
     val query = new Query(url)
@@ -23,6 +23,7 @@ object RedisSearchThread extends Thread with Logging {
   override def run() = {
     while (true) {
       Thread sleep sleepTime
+      log.info("Call refinement %d", sleepTime)
       val urlTask = RedisFutureStorage.getUrlTask()
       if (urlTask.isDefined) {
         val (url, lastMessage) = urlTask.get
@@ -34,8 +35,9 @@ object RedisSearchThread extends Thread with Logging {
           tweets foreach {
             status: Tweet =>
               TweetStorage !('index, status)
-              saveUrlFromSearch(status.getFromUser, url, status.getId, status.getCreatedAt)
+              GraphStorage ! ('save_rf_url, status.getFromUser, status.getFromUserId, url, status.getId, status.getCreatedAt)
           }
+          sleepTime = 1000 * 10
         } catch {
           case ex: TwitterException =>
             log.error(ex.getErrorMessage)

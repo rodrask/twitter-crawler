@@ -6,14 +6,14 @@ import com.codahale.logula.Logging
 import scala.collection.JavaConversions._
 import sys.ShutdownHookThread
 import org.neo4j.scala.{DatabaseService, EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
-import twitter4j.User
 import org.neo4j.graphdb.index.UniqueFactory
 import java.util.{Map => JavaMap, Date}
 import org.neo4j.index.lucene.ValueContext
-import org.neo4j.scala.TypedTraverser
 import org.neo4j.graphdb._
+import actors.Actor
+import twitter4j.{Tweet, Status, User}
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with TypedTraverser with Logging {
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging with Actor {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
   val UNKNOWN = "unknown"
@@ -37,18 +37,9 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     shutdown(ds)
   }
 
-  def stop={
-   shutdown(ds) 
-  }
-
-  private def getOrCreateUniqueUser(username: String) = {
-    val factory: UniqueFactory[Node] = new UniqueFactory.UniqueNodeFactory(userIndex) {
-      def initialize(created: Node, properties: JavaMap[String, AnyRef]) {
-        created("name") = properties get "name"
-        created("nodeType") = "USER"
-      }
-    }
-    factory.getOrCreate("name", username)
+  def stopStorage = {
+    exit()
+    shutdown(ds)
   }
 
   private def getOrCreateUniqueEntity(name: String) = {
@@ -118,7 +109,6 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           userNode("profileSidebarBorderColor") = profileSidebarBorderColor
           userNode("profileUseBackgroundImage") = user.isProfileUseBackgroundImage
 
-
           userNode("i") = 1
 
           userIndex +=(userNode, "name", user.getScreenName)
@@ -147,8 +137,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     result == null
   }
 
-
-  def saveRetweet(fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) = {
+  private def saveRetweet(fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) = {
     if (isNew("RT", thisMessageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -163,7 +152,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def saveMention(fromU: User, toId: Long, toScreenName: String, messageId: Long, when: Date) = {
+  private def saveMention(fromU: User, toId: Long, toScreenName: String, messageId: Long, when: Date) = {
     if (isNew("MENTION", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -182,7 +171,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
 
   }
 
-  def saveUrl(user: User, showedUrl: String, realUrl: String, messageId: Long, when: Date) = {
+  private def saveUrl(user: User, showedUrl: String, realUrl: String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -197,11 +186,13 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def saveUrlFromSearch(username: String, realUrl: String, messageId: Long, when: Date) = {
+  private def saveUrlFromSearch(username: String, userId: Long, realUrl: String, messageId: Long, when: Date) = {
     if (isNew("POSTED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
-          val userNode = getOrCreateUniqueUser(username)
+          val userNode = getOrCreateUniqueUser(userId)
+          userNode("name") = username
+          userIndex +=(userNode, "name", username)
           val urlNode = getOrCreateUniqueEntity(realUrl)
           val rel: Relationship = userNode --> "POSTED" --> urlNode <()
           saveEvent("POSTED", rel, messageId, when)
@@ -210,7 +201,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def saveHashTag(user: User, hashTag: String, messageId: Long, when: Date) = {
+  private def saveHashTag(user: User, hashTag: String, messageId: Long, when: Date) = {
     if (isNew("TAGGED", messageId)) {
       withTx {
         implicit ds: DatabaseService =>
@@ -237,6 +228,25 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
         }
     }
     newCountUser
+  }
+
+  def act() {
+    loopWhile(true) {
+      react {
+        case ('save_rt, fromU: User, toU: User, thisMessageId: Long, baseMessageId: Long, when: Date) =>
+          saveRetweet(fromU, toU, thisMessageId, baseMessageId, when)
+        case ('save_mention, fromU: User, toId: Long, toScreenName: String, messageId: Long, when: Date) =>
+          saveMention(fromU, toId, toScreenName, messageId, when)
+        case ('save_url, user: User, showedUrl: String, realUrl: String, messageId: Long, when: Date) =>
+          saveUrl(user, showedUrl, realUrl, messageId, when)
+        case ('save_rf_url, username: String, userId: Long, realUrl: String, messageId: Long, when: Date) =>
+          saveUrlFromSearch(username, userId, realUrl, messageId, when)
+        case ('save_hash, user: User, hashTag: String, messageId: Long, when: Date ) =>
+          saveHashTag(user, hashTag, messageId, when)
+        case 'stop =>
+          stopStorage
+      }
+    }
   }
 
   /*
@@ -296,5 +306,4 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
         getAllNodes filter (n => !n.hasProperty("name") && n.hasProperty(USER_ID) && n.getProperty(USER_ID) != 1) drop (1) take (size) toList
     }
   }
-
 }
