@@ -3,7 +3,6 @@ package twitter.crawler.storm
 import twitter4j.StatusDeletionNotice
 import twitter4j.StatusListener
 import twitter4j.Status
-import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.common._
 import twitter.crawler.utils.RedisUrlEnlarger._
 import com.codahale.logula.Logging

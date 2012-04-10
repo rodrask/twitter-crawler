@@ -1,22 +1,22 @@
 package twitter.crawler
-
-import storages.GraphStorage
-import java.util.{Date, Calendar}
-import java.io.FileWriter
+import twitter.crawler.metrics.Pattern
+import collection.immutable.SortedSet
 
 object Main extends App {
-	val file = new FileWriter("result.txt", true)
-	println("before")
-  GraphStorage.makeQuery(
-  """
-  start u=node:users("name:navalny")
-  match ()-[r:READS]->u
-  return u.twId? as id, u.name? as name, count(r) as n limit 100
-  """
-  ) foreach {m => println(m("n"))}
-
-  	GraphStorage.stopStorage
-  	file.close()
-  println("exit")
-  0
+  val history = SortedSet[Long](1, 5, 10, 20, 50, 100, 1000)
+  val borders = Pattern.makeBorders(1, List[Long](9,5,2)) //1, 10, 15, 17
+  val a = new Pattern(borders)
+  println(a.getProjectedHistory(history))
+  println(a.getProjectedHistory(history, true))
+//  var h: Long= -1
+//  (1 to 1) foreach  {
+//    _ =>
+//      println("new Hop")
+//      h = a.hopLength()
+//      println(a.hopLength)
+//      a.doHop(h)
+//      println(a)
+//      println(a.getProjectedHistory)
+//  }
+  println(List(1|1,1|0,0|1,0|0))
 }
