@@ -8,8 +8,9 @@ import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.{GraphStorage, RedisFutureStorage, TweetStorage}
 
 object RedisSearchThread extends Thread with Logging {
+  var withRemoving: Boolean = false
   val twitter = TwitterService.newRestInstance("search")
-  var sleepTime: Long = 1000 * 10
+  var sleepTime: Long = 1000 * 1
 
   def buildQuery(url: String, lastMessage: Option[Long]): Query = {
     val query = new Query(url)
@@ -24,20 +25,22 @@ object RedisSearchThread extends Thread with Logging {
     while (true) {
       Thread sleep sleepTime
       log.info("Call refinement %d", sleepTime)
-      val urlTask = RedisFutureStorage.getUrlTask()
+      val urlTask = RedisFutureStorage.getUrlTask(withRemoving)
       if (urlTask.isDefined) {
         val (url, lastMessage) = urlTask.get
         log.info("Search for: %s", url)
         try {
           val result: QueryResult = twitter.search(buildQuery(url, lastMessage))
           val tweets = result.getTweets
-          RedisFutureStorage.updateLastMessageUrl(url, result.getMaxId)
+          if (!withRemoving) {
+            RedisFutureStorage.updateLastMessageUrl(url, result.getMaxId)
+          }
           tweets foreach {
             status: Tweet =>
               TweetStorage !('index, status)
-              GraphStorage ! ('save_rf_url, status.getFromUser, status.getFromUserId, url, status.getId, status.getCreatedAt)
+              GraphStorage !('save_rf_url, status.getFromUser, status.getFromUserId, url, status.getId, status.getCreatedAt)
           }
-          sleepTime = 1000 * 10
+          sleepTime = 1000 * 1
         } catch {
           case ex: TwitterException =>
             log.error(ex.getErrorMessage)

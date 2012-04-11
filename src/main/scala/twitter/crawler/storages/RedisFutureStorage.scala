@@ -88,7 +88,7 @@ object RedisFutureStorage extends Logging {
     }
   }
 
-  def getUrlTask(): Option[(String, Option[Long])] = {
+  def getUrlTask(withRemoving: Boolean=false): Option[(String, Option[Long])] = {
     log.info("Call get url task")
     val jedis = redisPool.getResource()
     try {
@@ -107,7 +107,7 @@ object RedisFutureStorage extends Logging {
       val lastMessage = if (lMField == null) None else Some(lMField.toLong)
 
       val intervalIndex = jedis.hget(url, INTERVAL_FIELD).toInt
-      if (intervalIndex >= 3) {
+      if (intervalIndex >= 3 || withRemoving) {
         log.info("Remove url task %s", url)
         delTask(jedis, URL_TASK, url)
         jedis.hdel(url, LAST_MESSAGE_FIELD)
