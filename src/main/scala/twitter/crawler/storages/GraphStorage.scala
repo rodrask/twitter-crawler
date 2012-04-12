@@ -12,6 +12,7 @@ import org.neo4j.index.lucene.ValueContext
 import org.neo4j.graphdb._
 import actors.Actor
 import twitter4j.{Tweet, Status, User}
+import collection.immutable.SortedSet
 
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging with Actor {
   val USER_ID = "twId"
@@ -241,7 +242,7 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
           saveUrl(user, showedUrl, realUrl, messageId, when)
         case ('save_rf_url, username: String, userId: Long, realUrl: String, messageId: Long, when: Date) =>
           saveUrlFromSearch(username, userId, realUrl, messageId, when)
-        case ('save_hash, user: User, hashTag: String, messageId: Long, when: Date ) =>
+        case ('save_hash, user: User, hashTag: String, messageId: Long, when: Date) =>
           saveHashTag(user, hashTag, messageId, when)
         case 'stop =>
           stopStorage
@@ -306,4 +307,37 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
         getAllNodes filter (n => !n.hasProperty("name") && n.hasProperty(USER_ID) && n.getProperty(USER_ID) != 1) drop (1) take (size) toList
     }
   }
+
+  def getUsername(userId: Long)={
+    val hits = userIndex.get(USER_ID, new ValueContext(userId).getValue)
+      if (hits.size() > 0)
+        hits.getSingle.getProperty("name", "None")
+      else
+        "Bad userId: "+userId
+  }
+
+  def userUrlsTs(userId: Long): SortedSet[Long] = {
+    val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
+    if (node == null){
+      log.info("Bad id: %d",userId)
+      return SortedSet.empty
+    }
+    log.info("Urls for user: %s",node("name").getOrElse("None"))
+    val extractFunc: Relationship => Long = {
+      rel =>
+        rel[Long]("ts").get
+    }
+    SortedSet(node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc): _*)
+  }
+  def userUrls(userId: Long): Seq[(String, Long)] = {
+    val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
+    log.info("Urls for user: %s",node("name"))
+    val extractFunc: Relationship => (String, Long) = {
+      rel =>
+        (rel.getEndNode().getProperty("name", "None").toString, rel[Long]("ts").get)
+    }
+    node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc)
+  }
+
+
 }
