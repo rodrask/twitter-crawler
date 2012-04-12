@@ -4,7 +4,6 @@ import collection.immutable.SortedSet
 
 class Pattern(startTs: Long, intervals: List[Long]) {
   var borders: List[Long] = intervals.scanLeft(startTs)(_ + _)
-
   def rightBorder = borders(borders.size - 2)
 
   def move(duration: Long) = {
@@ -29,6 +28,10 @@ class Pattern(startTs: Long, intervals: List[Long]) {
           iter.head - b
     }
     borders.map(bMinMove).min + 1
+  }
+
+  def isInside(to: Long)={
+    borders.last <=  to+1
   }
 
 

@@ -14,12 +14,12 @@ import actors.Actor
 import twitter4j.{Tweet, Status, User}
 import collection.immutable.SortedSet
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging with Actor {
+object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging with Actor {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
   val UNKNOWN = "unknown"
 
-  override def neo4jStoreDir = storageProperties("graph.storage")
+  override def neo4jStoreDir = storageProperties("friend.storage")
 
   val indexProperties: IndexCustomConfig = Some(Map("provider" -> "lucene", "type" -> "exact"))
 
@@ -308,30 +308,31 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
   }
 
-  def getUsername(userId: Long): String={
+  def getUsername(userId: Long) = {
     val hits = userIndex.get(USER_ID, new ValueContext(userId).getValue)
-      if (hits.size() > 0)
-        hits.getSingle.getProperty("name", "None").toString
-      else
-        "Bad userId: "+userId
+    if (hits.size() > 0)
+      hits.getSingle.getProperty("name", "None")
+    else
+      "Bad userId: " + userId
   }
 
   def userUrlsTs(userId: Long): SortedSet[Long] = {
     val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
-    if (node == null){
-      log.info("Bad id: %d",userId)
+    if (node == null) {
+      log.info("Bad id: %d", userId)
       return SortedSet.empty
     }
-    log.info("Urls for user: %s",node("name").getOrElse("None"))
+    log.info("Urls for user: %s", node("name").getOrElse("None"))
     val extractFunc: Relationship => Long = {
       rel =>
         rel[Long]("ts").get / 1000
     }
     SortedSet(node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc): _*)
   }
+
   def userUrls(userId: Long): Seq[(String, Long)] = {
     val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
-    log.info("Urls for user: %s",node("name"))
+    log.info("Urls for user: %s", node("name"))
     val extractFunc: Relationship => (String, Long) = {
       rel =>
         (rel.getEndNode().getProperty("name", "None").toString, rel[Long]("ts").get)
@@ -339,16 +340,19 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc)
   }
 
-  def userRetweeters(userId: Long): Set[Long] = {
+  def userFollowers(userId: Long): List[Long] = {
     val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
     if (node == null){
-      log.info("Bad id: %d",userId)
-      return Set.empty
+      log.info("Node not found")
+      return List[Long]()
     }
+    println(node.getRelationships(Direction.INCOMING))
     val extractFunc: Relationship => Long = {
       rel =>
-        rel.getStartNode.getProperty("twId").asInstanceOf[Long]
+        rel.getStartNode().getProperty(USER_ID, -1).asInstanceOf[Long]
     }
-    Set(node.getRelationships(Direction.INCOMING, DynamicRelationshipType.withName("RT")).toList.map(extractFunc): _*)
+    node.getRelationships(Direction.INCOMING, DynamicRelationshipType.withName("READS")).map(extractFunc).toList
   }
+
+
 }

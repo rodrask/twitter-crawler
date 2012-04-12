@@ -10,7 +10,7 @@ import java.io.FileReader
 import redis.clients.jedis.{JedisPoolConfig, JedisPool}
 
 package object common {
-	val commonProperties = loadConf("src/main/resources/app.properties")
+	val commonProperties = loadConf("src/main/resources/storages.properties")
   val storageProperties = loadConf("src/main/resources/storages.properties")
   val redisPool: JedisPool = new JedisPool(new JedisPoolConfig(), "localhost", 6379)
 
