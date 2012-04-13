@@ -70,7 +70,7 @@ object TweetStorage extends Actor with Logging {
     val doc = new Document
     doc.add(new Field(MESSAGE_ID, id.toString, Field.Store.YES, Field.Index.NOT_ANALYZED))
     doc.add(new Field("creationDate", dateToString(date, Resolution.SECOND), Field.Store.YES, Field.Index.NOT_ANALYZED))
-    doc.add(new Field("content", content, Field.Store.NO, Field.Index.ANALYZED, TermVector.YES))
+    doc.add(new Field("content", content, Field.Store.YES, Field.Index.ANALYZED, TermVector.YES))
     return doc
 
   }
