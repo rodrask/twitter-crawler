@@ -14,7 +14,7 @@ import actors.Actor
 import twitter4j.{Tweet, Status, User}
 import collection.immutable.SortedSet
 
-object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with Logging with Actor {
+object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with NeoQueriesTrait with Logging with Actor {
   val USER_ID = "twId"
   val MESSAGE_ID = "messageId"
   val UNKNOWN = "unknown"
@@ -254,45 +254,45 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
   * Ниже буду аналитические функции
 
   */
-  def makeQuery(query: String) = {
-    engine.execute(query)
-  }
+  // def makeQuery(query: String) = {
+  //   engine.execute(query)
+  // }
 
-  val cypherParser = new CypherParser
-  val engine = new ExecutionEngine(ds.gds);
+  // val cypherParser = new CypherParser
+  // val engine = new ExecutionEngine(ds.gds);
 
-  def topFriendsUsers(topN: Int = 100) = {
-    val r = engine.execute(
-      """
-      start user=node:users("name:*")
-      match user-[r:READS]->f
-      return user.twId as id, user.name as user, count(f) as n order by count(f) desc limit {topN}
-      """, Map("topN" -> topN))
-    r map (m => m("id"))
-  }
+  // def topFriendsUsers(topN: Int = 100) = {
+  //   val r = engine.execute(
+  //     """
+  //     start user=node:users("name:*")
+  //     match user-[r:READS]->f
+  //     return user.twId as id, user.name as user, count(f) as n order by count(f) desc limit {topN}
+  //     """, Map("topN" -> topN))
+  //   r map (m => m("id"))
+  // }
 
-  def usersWithUrls(from: Date, to: Date) = {
-    val r = engine.execute(
-      """
-      start user=node:users(nodeType="USER")
-      match user-[r:POSTED]->url
-      where r.ts > {from} and r.ts < {to}
-      return user.name as user, collect(url) as urls
-      """, Map("from" -> from.getTime, "to" -> to.getTime))
-    r foreach {
-      m => println(m)
-    }
-  }
+  // def usersWithUrls(from: Date, to: Date) = {
+  //   val r = engine.execute(
+  //     """
+  //     start user=node:users(nodeType="USER")
+  //     match user-[r:POSTED]->url
+  //     where r.ts > {from} and r.ts < {to}
+  //     return user.name as user, collect(url) as urls
+  //     """, Map("from" -> from.getTime, "to" -> to.getTime))
+  //   r foreach {
+  //     m => println(m)
+  //   }
+  // }
 
-  def aloneUsers() = {
-    val r = engine.execute(
-      """
-      start user=node:users(nodeType="USER")
-      match user-[:POSTED]->url
-      return user.name?, collect(url.name?)  LIMIT 100
-      """)
-    r
-  }
+  // def aloneUsers() = {
+  //   val r = engine.execute(
+  //     """
+  //     start user=node:users(nodeType="USER")
+  //     match user-[:POSTED]->url
+  //     return user.name?, collect(url.name?)  LIMIT 100
+  //     """)
+  //   r
+  // }
 
   def batchNodesWithoutFriends(size: Int): List[Node] = {
     withTx {
