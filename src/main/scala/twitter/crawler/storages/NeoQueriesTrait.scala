@@ -25,8 +25,6 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractFunction(result)
   }
 
-
-
   def getUserUrlsPosts(twId: Long, from: Long, to: Long )={
     val extractFunction: ExecutionResult => AnyRef = {
       result: ExecutionResult =>
@@ -50,5 +48,19 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
 		"""
     val result = engine.execute(query, Map("url" -> url, "from" -> from, "to" -> to))
     extractFunction(result)
+  }
+
+  def urlFactors(url: String, from: Long, to: Long):ExecutionResult={
+    val query = """
+    start url=node:entities(name={url}) match user-[r:POSTED]->url
+    where r.ts >= {from} and r.ts <= {to}
+    return url.name as url,
+           count(r) as postCount,
+           collect(distinct user.name) as uniqueUsers,
+           collect(distinct user) as usersNodes,
+           collect(r.ts) as timestamps
+    """
+    val result = engine.execute(query, Map("url" -> url, "from"->from, "to"->to))
+    result
   }
 }
