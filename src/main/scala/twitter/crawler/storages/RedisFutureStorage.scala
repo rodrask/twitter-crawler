@@ -9,7 +9,7 @@ object RedisFutureStorage extends Logging {
   val MINUTE = 60 * 1000
   val HOUR = 60 * MINUTE
   val DAY = 24 * HOUR
-  val INTERVALS: List[Long] = List[Long](MINUTE, HOUR - MINUTE, 5 * HOUR, 19 * HOUR)
+  val INTERVALS: List[Long] = List[Long](0, HOUR, 5 * HOUR, 19 * HOUR)
 
   val RT_TASK = "RT"
   val URL_TASK = "URL"
@@ -78,7 +78,6 @@ object RedisFutureStorage extends Logging {
     val jedis = redisPool.getResource()
     try {
       if (!inStorage(jedis, url)) {
-        log.info("New Url %s", url)
         insertTask(jedis, URL_TASK, url, 0)
         if (lastMessage.isDefined)
           jedis.hset(url, LAST_MESSAGE_FIELD, lastMessage.toString)
@@ -88,7 +87,7 @@ object RedisFutureStorage extends Logging {
     }
   }
 
-  def getUrlTask(withRemoving: Boolean=false): Option[(String, Option[Long])] = {
+  def getUrlTask(withRemoving: Boolean = false): Option[(String, Option[Long])] = {
     log.info("Call get url task")
     val jedis = redisPool.getResource()
     try {
@@ -99,7 +98,6 @@ object RedisFutureStorage extends Logging {
       }
       val tuple = result.iterator().next()
       if (System.currentTimeMillis < tuple.getScore) {
-        log.info("Value %s will called %s but now %s", tuple.getElement, new Date(tuple.getScore.asInstanceOf[Long]), new Date())
         return None
       }
       val url = tuple.getElement
@@ -122,7 +120,7 @@ object RedisFutureStorage extends Logging {
     }
   }
 
-  def updateLastMessageUrl(url: String, lastMessage: Long) = {
+  def updateLastMessageUrl(url: String, lastMessage: Long, foundResults: Int) = if (foundResults > 0) {
     val jedis = redisPool.getResource()
     try {
       if (inStorage(jedis, url)) {
@@ -132,5 +130,7 @@ object RedisFutureStorage extends Logging {
     } finally {
       redisPool.returnResource(jedis);
     }
+  } else {
+
   }
 }

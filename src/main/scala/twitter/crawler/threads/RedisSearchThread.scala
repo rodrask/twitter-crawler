@@ -4,7 +4,6 @@ import twitter.crawler.common.TwitterService
 import scala.collection.JavaConversions._
 import twitter4j.{TwitterException, Tweet, QueryResult, Query}
 import com.codahale.logula.Logging
-import twitter.crawler.storages.GraphStorage._
 import twitter.crawler.storages.{GraphStorage, RedisFutureStorage, TweetStorage}
 
 object RedisSearchThread extends Thread with Logging {
@@ -15,6 +14,7 @@ object RedisSearchThread extends Thread with Logging {
   def buildQuery(url: String, lastMessage: Option[Long]): Query = {
     val query = new Query(url)
     query.setRpp(100)
+    query.setLang("ru")
     if (lastMessage.isDefined)
       query.setSinceId(lastMessage.get)
     query.setResultType(Query.RECENT)
@@ -33,7 +33,7 @@ object RedisSearchThread extends Thread with Logging {
           val result: QueryResult = twitter.search(buildQuery(url, lastMessage))
           val tweets = result.getTweets
           if (!withRemoving) {
-            RedisFutureStorage.updateLastMessageUrl(url, result.getMaxId)
+            RedisFutureStorage.updateLastMessageUrl(url, result.getMaxId, tweets.size())
           }
           tweets foreach {
             status: Tweet =>
