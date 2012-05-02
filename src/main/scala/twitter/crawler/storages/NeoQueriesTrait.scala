@@ -3,12 +3,13 @@ package twitter.crawler.storages
 import org.neo4j.scala.{EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
 import org.neo4j.cypher.{ExecutionResult, CypherParser, ExecutionEngine}
 import org.neo4j.graphdb.Node
+import scala.Long
+import scala.Predef._
 
 case class UrlRawFactors(timestamps: List[Long], users: List[Node])
 trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider {
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
-
 
   private def makeQuery(query: String, params: Map[String, Any]): ExecutionResult = {
     engine.execute(query, params)
@@ -63,14 +64,14 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractNameAndList apply makeQuery(query, Map("id" -> twId, "from" -> from, "to" -> to))
   }
 
-  def getUsersUrlsTs(ids: List[Long], from: Long, to: Long): Seq[(String, List[Long])] = {
+  def getUserUrlsTs(name: String, from: Long, to: Long): (String, List[Long]) = {
     val query = """
-		start user=node({ids})
+		start user=node:users(name={name})
 		match user-[r:POSTED]->()
 		 where r.ts>={from} and r.ts<={to}
 		return user.name as name, collect(r.ts) as timestamps
 		"""
-    extractNameAndList apply makeQuery(query, Map("id" -> twId, "from" -> from, "to" -> to))
+    extractNameAndList apply makeQuery(query, Map("name" -> name, "from" -> from, "to" -> to))
   }
 
 //  def getUrlSubgraph(url: String, from: Long, to: Long): List[Node] = {
@@ -108,5 +109,4 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractFactors apply makeQuery(query, Map("url" -> url, "from" -> from, "to" -> to))
   }
 
-  def
 }

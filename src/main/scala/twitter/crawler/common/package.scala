@@ -26,6 +26,10 @@ package object common {
     val file = scala.io.Source.fromFile(name)
     file.getLines().map(l => l.toLong).toList
   }
+  def loadTwiNames(name: String): Seq[String]={
+    val file = scala.io.Source.fromFile(name)
+    file.getLines().toList
+  }
 
   val twiRegex = new Regex("^http://twitter.com/(.*)$")
   def parseURL(address: String): String = {

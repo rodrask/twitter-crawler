@@ -14,6 +14,7 @@ object SearchThread extends Thread with Logging {
 
   def buildQuery(task: UrlTask): Query = {
     val query = new Query(task.url)
+    query.setLang("ru")
     query.setRpp(100)
     if (task.lastMessage.isDefined)
       query.setSinceId(task.lastMessage.get)
