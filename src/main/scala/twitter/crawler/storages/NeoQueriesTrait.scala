@@ -43,7 +43,7 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
       } else {
         val map = result.next()
         val ts = map.getOrElse("timestamps", None) match {
-          case l: List[Long] => l
+          case l: List[Long] => l map (ts => ts / 1000)
           case _ => List.empty[Long]
         }
         val name = map.getOrElse("name", "None") match {

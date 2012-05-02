@@ -18,7 +18,7 @@ class SubgraphBuilder(names: Seq[String]) {
         val currentTs = System.currentTimeMillis()
         val timestamps = SortedSet(getUserUrlsTs(name, 0l, currentTs)._2: _*)
         if (timestamps.size >= 10) {
-          println("save "+name)
+          println("save "+name+" "+timestamps)
           tsMap(name) = timestamps
           val distr = new SingleDistribution(timestamps.head, timestamps.last + 1, timestamps)
           conditionalEntropy(name) = computeCondEntropy(distr.computeCounters(INTERVALS), distr.total)
