@@ -42,6 +42,9 @@ object JoinedProcesses {
     (begin, end)
   }
 
+  def bias(total: Int, length: Int): Double={
+    ((1 << length-1) - 1)/(2.0*total*LN2)
+  }
 
   def calculateIT(fromProcess: SortedSet[Long], toProcess: SortedSet[Long]) = {
     val (begin, end): (Long, Long) = borders(toProcess, fromProcess)
@@ -54,22 +57,19 @@ object JoinedProcesses {
     }
     val (single, joined) = new JoinedProcesses(toProcess, fromProcess).joinedDistribution(mainBins, additionalBins)
 
-//    println(single)
-//    val singleMerged = single.merge(dropLast)
-//    println(singleMerged)
-//    println(single.entropy())
-//    println(singleMerged.entropy())
-//    println(single.entropy() - singleMerged.entropy())
-//
-//    println(joined)
-//    val joinedMerged = joined.merge(dropLast)
-//    println(joinedMerged)
-//    println(joined.entropy())
-//    println(joinedMerged.entropy())
-
-
     val singleConditionalEntropy = single.entropy() - single.merge(dropLast).entropy()
+    val singleBias = bias(single.total, INTERVALS.size)
+
+    println("base "+singleConditionalEntropy)
+    println("adj "+ (singleConditionalEntropy - singleBias))
     val joinedConditionalEntropy = joined.entropy() - joined.merge(dropLast).entropy()
+    val joinedBias = bias(joined.total, INTERVALS.size + ADDITIONAL_INTERVALS.size)
+
+    println("base "+joinedConditionalEntropy)
+    println("adj "+(joinedConditionalEntropy - joinedBias))
+
+    println("base "+(singleConditionalEntropy - joinedConditionalEntropy))
+    println("adj "+(singleConditionalEntropy - singleBias - joinedConditionalEntropy + joinedBias))
     singleConditionalEntropy - joinedConditionalEntropy
   }
 }

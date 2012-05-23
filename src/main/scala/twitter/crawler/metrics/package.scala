@@ -1,7 +1,10 @@
 package twitter.crawler
 import collection.immutable.SortedSet
 import scala.math.{min, max}
-import twitter.crawler.metrics.SingleDistribution.{dumpDistrMap, computeCondEntropy}
+import scalax.collection.Graph
+import scala.math.log
+import scalax.collection.edge.{LDiEdge, WkDiEdge, WDiEdge}
+
 package object metrics {
   val SECOND = 1l
   val MINUTE = 60 * SECOND
@@ -9,26 +12,26 @@ package object metrics {
   val DAY = 24 * HOUR
   val INTERVALS = List(12*HOUR, 2 * HOUR, 10 * MINUTE, SECOND)
   val ADDITIONAL_INTERVALS = List(12*HOUR, 2 * HOUR, 10 * MINUTE)
+
   val INTERVALS_TEST = List(60 * MINUTE, SECOND)
 
-  def calculateIC(YHist: SortedSet[Long], XHist: SortedSet[Long], fromTs: Long, toTs: Long): Double = {
-    val XDistr = new SingleDistribution(fromTs, toTs,XHist.range(fromTs, toTs+1))
-    val Y_X_Distr = new JoinedDistribution(fromTs, toTs, YHist.range(fromTs, toTs+1), XHist.range(fromTs, toTs+1))
-    val xCounters = XDistr.computeCounters(INTERVALS)
-    val XEntr = computeCondEntropy(xCounters, XDistr.total)
+  def nodePairs[T](map: Map[T, Any]): Iterator[IndexedSeq[T]]= map.keys.toIndexedSeq.combinations(2)
 
-    val yxCounters = Y_X_Distr.computeCounters(INTERVALS)
-    val YXEntr = computeCondEntropy(yxCounters, Y_X_Distr.total)
-
-    return XEntr - YXEntr
-  }
-  def calculateIC(fromHistory: SortedSet[Long], toHistory: SortedSet[Long]): Double = {
-    val (from, to) = borders(fromHistory, toHistory)
-    calculateIC(fromHistory: SortedSet[Long], toHistory: SortedSet[Long], from: Long, to: Long)
+  val LN2 = log(2)
+  def log2(x: Double) = {
+    log(x) / LN2
   }
 
-  def borders(fromHistory: SortedSet[Long], toHistory: SortedSet[Long]): (Long, Long)={
-    (max(fromHistory.min, toHistory.min), min(fromHistory.max, toHistory.max))
+  def createGraph(mapData: Map[String, SortedSet[Long]]): Graph[String, WDiEdge]={
+    nodePairs(mapData.filter(entry => entry._2.size >= 10 )).foreach{
+      pair:IndexedSeq[String] =>
+        val first = pair(0)
+        val second = pair(1)
+        val direct = JoinedProcesses.calculateIT(mapData(pair(0)), mapData(pair(1)))
+        val reverse = JoinedProcesses.calculateIT(mapData(pair(1)), mapData(pair(0)))
+    }
+    null
   }
+
 
 }

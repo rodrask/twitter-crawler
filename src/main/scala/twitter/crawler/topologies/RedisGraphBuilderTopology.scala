@@ -4,7 +4,7 @@ import twitter.crawler.storm.TwitterStreamListener
 import twitter.crawler.common.TwitterService
 import twitter4j.FilterQuery
 import twitter.crawler.common.loadId
-import twitter.crawler.threads.{RedisSearchThread, RedisRetweetsThread, SearchThread, RetweetsThread}
+import twitter.crawler.threads.{RedisSearchThread, RedisRetweetsThread}
 import twitter.crawler.storages.{GraphStorage, TweetStorage, FutureTasksStorage}
 
 object RedisGraphBuilderTopology {

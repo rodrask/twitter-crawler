@@ -1,12 +1,12 @@
 package twitter.crawler.metrics
 
 import collection.mutable
-import twitter.crawler.metrics.SingleDistribution.log2
 
 class Distribution[T](counters: mutable.Map[T, Int] = mutable.Map.empty[T, Int]) {
   def clear = {
     counters.clear()
   }
+  var total = 0;
 
   def increment(key: T, value: Int = 1) = {
     val counter = counters.getOrElse(key, 0)
@@ -14,7 +14,6 @@ class Distribution[T](counters: mutable.Map[T, Int] = mutable.Map.empty[T, Int])
   }
 
   def entropy(): Double = {
-    var total = 0
     var partialEntropy = 0.0
     for (counter <- counters.values){
       total+=counter
