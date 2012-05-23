@@ -8,6 +8,7 @@ package object metrics {
   val HOUR = 60 * MINUTE
   val DAY = 24 * HOUR
   val INTERVALS = List(12*HOUR, 2 * HOUR, 10 * MINUTE, SECOND)
+  val ADDITIONAL_INTERVALS = List(12*HOUR, 2 * HOUR, 10 * MINUTE)
   val INTERVALS_TEST = List(60 * MINUTE, SECOND)
 
   def calculateIC(YHist: SortedSet[Long], XHist: SortedSet[Long], fromTs: Long, toTs: Long): Double = {
