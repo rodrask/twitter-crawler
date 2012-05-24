@@ -1,8 +1,13 @@
 package twitter.crawler.metrics
 
 import collection.mutable
-
+import twitter.crawler.metrics.log2
 class Distribution[T](counters: mutable.Map[T, Int] = mutable.Map.empty[T, Int]) {
+
+  def this(data: Seq[T])={
+    this()
+    data foreach (this.increment(_))
+  }
   def clear = {
     counters.clear()
   }
@@ -37,4 +42,11 @@ class Distribution[T](counters: mutable.Map[T, Int] = mutable.Map.empty[T, Int])
     }
     result
   }
+}
+
+object Distribution{
+  def diffStream(ts: Iterable[Long]): Stream[Long]={
+    (ts zip ts.tail).toStream map (t => t._2 - t._1)
+  }
+
 }

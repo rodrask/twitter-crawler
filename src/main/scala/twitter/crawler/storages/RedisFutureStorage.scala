@@ -120,17 +120,25 @@ object RedisFutureStorage extends Logging {
     }
   }
 
-  def updateLastMessageUrl(url: String, lastMessage: Long, foundResults: Int) = if (foundResults > 0) {
+  def updateLastMessageUrl(url: String, lastMessage: Long, foundResults: Int) = {
     val jedis = redisPool.getResource()
     try {
-      if (inStorage(jedis, url)) {
-        log.info("Update last message for url %s", url)
-        jedis.hset(url, LAST_MESSAGE_FIELD, lastMessage.toString)
+      if (foundResults > 0) {
+        if (inStorage(jedis, url)) {
+          log.info("Update last message for url %s", url)
+          jedis.hset(url, LAST_MESSAGE_FIELD, lastMessage.toString)
+        }
+      } else {
+        log.info("No new tweets for url %s", url)
+        if (inStorage(jedis, url) && jedis.hget(url, INTERVAL_FIELD).toInt > 1) {
+          log.info("Delete rare url %s", url)
+          delTask(jedis, URL_TASK, url)
+          jedis.hdel(url, LAST_MESSAGE_FIELD)
+        }
       }
-    } finally {
+    }
+    finally {
       redisPool.returnResource(jedis);
     }
-  } else {
-
   }
 }

@@ -60,16 +60,8 @@ object JoinedProcesses {
     val singleConditionalEntropy = single.entropy() - single.merge(dropLast).entropy()
     val singleBias = bias(single.total, INTERVALS.size)
 
-    println("base "+singleConditionalEntropy)
-    println("adj "+ (singleConditionalEntropy - singleBias))
     val joinedConditionalEntropy = joined.entropy() - joined.merge(dropLast).entropy()
     val joinedBias = bias(joined.total, INTERVALS.size + ADDITIONAL_INTERVALS.size)
-
-    println("base "+joinedConditionalEntropy)
-    println("adj "+(joinedConditionalEntropy - joinedBias))
-
-    println("base "+(singleConditionalEntropy - joinedConditionalEntropy))
-    println("adj "+(singleConditionalEntropy - singleBias - joinedConditionalEntropy + joinedBias))
     singleConditionalEntropy - joinedConditionalEntropy
   }
 }

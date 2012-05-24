@@ -1,9 +1,7 @@
 package twitter.crawler
 import collection.immutable.SortedSet
 import scala.math.{min, max}
-import scalax.collection.Graph
 import scala.math.log
-import scalax.collection.edge.{LDiEdge, WkDiEdge, WDiEdge}
 
 package object metrics {
   val SECOND = 1l
@@ -22,7 +20,7 @@ package object metrics {
     log(x) / LN2
   }
 
-  def createGraph(mapData: Map[String, SortedSet[Long]]): Graph[String, WDiEdge]={
+  def createGraph(mapData: Map[String, SortedSet[Long]])={
     nodePairs(mapData.filter(entry => entry._2.size >= 10 )).foreach{
       pair:IndexedSeq[String] =>
         val first = pair(0)
