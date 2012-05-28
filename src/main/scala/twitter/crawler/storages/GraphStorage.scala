@@ -13,6 +13,7 @@ import org.neo4j.graphdb._
 import actors.Actor
 import twitter4j.{Tweet, Status, User}
 import collection.immutable.SortedSet
+import java.io.Writer
 
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with NeoQueriesTrait with Logging with Actor {
   val USER_ID = "twId"
@@ -351,4 +352,29 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     }
     Set(node.getRelationships(Direction.INCOMING, DynamicRelationshipType.withName("RT")).toList.map(extractFunc): _*)
   }
+
+
+  def allUrls(writer: Writer, skip:Int = 0, limit: Int=1000000, minSize: Int = 50)={
+    val result = entitiesIndex.query("name:http*")
+    println("size: "+result.size())
+    var i = 0
+    while (result.hasNext && i < skip){
+      result.next()
+      i += 1
+    }
+    i=0
+    var size = 0
+    while (result.hasNext && i < limit){
+      var hit = result.next()
+      i += 1
+      size = hit.getRelationships.toList.size
+      if (size >= minSize){
+        println(hit.getProperty("name")+"\t"+size)
+        writer.write(hit.getProperty("name")+"\t"+size+"\n")
+      }
+
+    }
+  }
+
+
 }

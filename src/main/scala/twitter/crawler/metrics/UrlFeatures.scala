@@ -21,6 +21,14 @@ class UrlFeatures(url: String, data: UrlData) {
 
   }
 
+  def toCsv = {
+    val buffer = new StringBuilder(url + "\t")
+    featuresMap foreach {
+      case (key, value) =>
+        buffer append "%s\t".format(value)
+    }
+    buffer.toString()
+  }
   override def toString = {
     val buffer = new StringBuilder(url + "\t")
     featuresMap foreach {

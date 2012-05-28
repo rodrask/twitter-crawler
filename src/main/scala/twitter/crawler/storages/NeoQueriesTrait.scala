@@ -2,10 +2,12 @@ package twitter.crawler.storages
 
 import org.neo4j.scala.{EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
 import org.neo4j.cypher.{ExecutionResult, CypherParser, ExecutionEngine}
-import org.neo4j.graphdb.Node
 import scala.Long
 import scala.Predef._
 import collection.immutable.SortedSet
+import scala.collection.JavaConverters._
+import org.neo4j.tooling.GlobalGraphOperations
+import org.neo4j.graphdb.{DynamicRelationshipType, RelationshipType, Direction, Node}
 
 case class UrlData(timestamps: SortedSet[Long], users: List[String])
 
@@ -83,34 +85,36 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
       toReturn
   }
 
-  def extractSortedSet[T <% Ordered[T]](field: String, mapF: T => T)(row: Map[String, Any]): SortedSet[T]={
+  def extractSortedSet[T <% Ordered[T]](field: String, mapF: T => T)(row: Map[String, Any]): SortedSet[T] = {
     row.getOrElse(field, None) match {
       case l: List[T] => SortedSet[T](l map mapF: _*)
       case _ => SortedSet.empty[T]
     }
   }
 
-  def extractList[T](field: String)(row: Map[String, Any]): List[T]  ={
+  def extractList[T](field: String)(row: Map[String, Any]): List[T] = {
     row.getOrElse(field, None) match {
       case l: List[T] => l
       case _ => List.empty[T]
     }
   }
-  def extractProperty(field: String)(row: Map[String, Any]): String={
+
+  def extractProperty(field: String)(row: Map[String, Any]): String = {
     row.getOrElse(field, None) match {
       case l: String => l
       case _ => "None"
     }
   }
-  val toSec : Long => Long = x => x/1000
-  val extractTimestamps:Map[String, Any] => SortedSet[Long] = extractSortedSet[Long]("timestamps",toSec)(_)
-  val extractNodes:Map[String, Any] => List[String] = extractList[String]("nodes")(_)
-  val extractName:Map[String, Any] => String = extractProperty("name")(_)
+
+  val toSec: Long => Long = x => x / 1000
+  val extractTimestamps: Map[String, Any] => SortedSet[Long] = extractSortedSet[Long]("timestamps", toSec)(_)
+  val extractNodes: Map[String, Any] => List[String] = extractList[String]("nodes")(_)
+  val extractName: Map[String, Any] => String = extractProperty("name")(_)
 
   val extractUrlsFactors: ExecutionResult => Iterator[(String, UrlData)] = {
     result: ExecutionResult =>
       for (row: Map[String, Any] <- result)
-        yield (extractName(row), UrlData(extractTimestamps(row), extractNodes(row)))
+      yield (extractName(row), UrlData(extractTimestamps(row), extractNodes(row)))
   }
 
   val extractSingleUrlFactors: ExecutionResult => UrlData = {
@@ -122,7 +126,6 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
         UrlData(extractTimestamps(row), extractNodes(row))
       }
   }
-
 
 
   def getUrlTimestamps(url: String, from: Long, to: Long): List[Long] = {
@@ -171,11 +174,11 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     return url.name? as name, collect(r.ts) as timestamps,
            collect(user.name) as users
                 """
-    extractUrlsFactors apply makeQuery(query, Map("skip" -> skip, "limit"->limit, "from" -> from, "to" -> to))
+    extractUrlsFactors apply makeQuery(query, Map("skip" -> skip, "limit" -> limit, "from" -> from, "to" -> to))
   }
 
 
-  def getUrlFactors(url: String, from: Long=0, to: Long=Long.MaxValue): UrlData = {
+  def getUrlFactors(url: String, from: Long = 0, to: Long = Long.MaxValue): UrlData = {
     val query = """
     start url=node:entities(name={url}) match user-[r:POSTED]->url
     where r.ts >= {from} and r.ts <= {to}
@@ -183,6 +186,13 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
            collect(user) as nodes
                 """
     extractSingleUrlFactors apply makeQuery(query, Map("url" -> url, "from" -> from, "to" -> to))
+  }
+
+  def urlsStream(): Iterable[String] = {
+    val relType = DynamicRelationshipType.withName("POSTED")
+    GlobalGraphOperations.at(ds.gds).getAllNodes.asScala.
+      filter(n => n.getProperty("nodeType", "") == "ENTITY" && n.getRelationships(Direction.INCOMING, relType).asScala.size > 10).
+      map(n => n.getProperty("name").toString )
   }
 
 }
