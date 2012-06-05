@@ -1,13 +1,14 @@
 package twitter.crawler.storages
 
 import org.neo4j.scala.{EmbeddedGraphDatabaseServiceProvider, Neo4jIndexProvider, Neo4jWrapper}
-import org.neo4j.cypher.{ExecutionResult, CypherParser, ExecutionEngine}
 import scala.Long
 import scala.Predef._
 import collection.immutable.SortedSet
 import scala.collection.JavaConverters._
 import org.neo4j.tooling.GlobalGraphOperations
-import org.neo4j.graphdb.{DynamicRelationshipType, RelationshipType, Direction, Node}
+import org.neo4j.index.lucene.ValueContext
+import org.neo4j.graphdb._
+import org.neo4j.cypher.{ExecutionResult, CypherParser, ExecutionEngine}
 
 case class UrlData(timestamps: SortedSet[Long], users: List[String])
 
@@ -15,7 +16,7 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
   val cypherParser = new CypherParser
   val engine = new ExecutionEngine(ds.gds);
 
-  private def makeQuery(query: String, params: Map[String, Any]): ExecutionResult = {
+  protected def makeQuery(query: String, params: Map[String, Any]): ExecutionResult = {
     engine.execute(query, params)
   }
 
@@ -188,11 +189,27 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractSingleUrlFactors apply makeQuery(query, Map("url" -> url, "from" -> from, "to" -> to))
   }
 
+  def numberOfRT(from: String, to: String): Long ={
+    val query =
+      """
+        start fromUser=node:users(name={from}), toUser=node:users(name={to})
+        match fromUser-[r:RT]->toUser
+        return count(r) as result
+      """
+    val extractFunc: ExecutionResult => Long = {
+      result =>
+        if (result.hasNext)
+          result.next().getOrElse("result", 0).asInstanceOf[Long]
+        else
+          0
+    }
+    extractFunc apply makeQuery(query, Map("from" -> from, "to" -> to))
+  }
+
   def urlsStream(): Iterable[String] = {
     val relType = DynamicRelationshipType.withName("POSTED")
     GlobalGraphOperations.at(ds.gds).getAllNodes.asScala.
       filter(n => n.getProperty("nodeType", "") == "ENTITY" && n.getRelationships(Direction.INCOMING, relType).asScala.size > 10).
       map(n => n.getProperty("name").toString )
   }
-
 }

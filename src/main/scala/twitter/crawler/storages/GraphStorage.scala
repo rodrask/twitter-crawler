@@ -353,7 +353,6 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     Set(node.getRelationships(Direction.INCOMING, DynamicRelationshipType.withName("RT")).toList.map(extractFunc): _*)
   }
 
-
   def allUrls(writer: Writer, skip:Int = 0, limit: Int=1000000, minSize: Int = 50)={
     val result = entitiesIndex.query("name:http*")
     println("size: "+result.size())
