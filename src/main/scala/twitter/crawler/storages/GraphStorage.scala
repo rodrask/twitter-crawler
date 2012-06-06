@@ -314,13 +314,26 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
       if (hits.size() > 0)
         hits.getSingle.getProperty("name", "None").toString
       else
-        "Bad userId: "+userId
+        null
   }
 
   def userUrlsTs(userId: Long): SortedSet[Long] = {
     val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
     if (node == null){
       log.info("Bad id: %d",userId)
+      return SortedSet.empty
+    }
+    log.info("Urls for user: %s",node("name").getOrElse("None"))
+    val extractFunc: Relationship => Long = {
+      rel =>
+        rel[Long]("ts").get / 1000
+    }
+    SortedSet(node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc): _*)
+  }
+  def userUrlsTs(userName: String): SortedSet[Long] = {
+    val node = userIndex.get("name", userName).getSingle
+    if (node == null){
+      log.info("Bad user: %s",userName)
       return SortedSet.empty
     }
     log.info("Urls for user: %s",node("name").getOrElse("None"))
@@ -340,15 +353,15 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
     node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName("POSTED")).toList.map(extractFunc)
   }
 
-  def userRetweeters(userId: Long): Set[Long] = {
-    val node = userIndex.get(USER_ID, new ValueContext(userId).getValue).getSingle
+  def userRetweeters(userName: String): Set[String] = {
+    val node = userIndex.get("name", userName).getSingle
     if (node == null){
-      log.info("Bad id: %d",userId)
+      log.info("Bad id: %d",userName)
       return Set.empty
     }
-    val extractFunc: Relationship => Long = {
+    val extractFunc: Relationship => String = {
       rel =>
-        rel.getStartNode.getProperty("twId").asInstanceOf[Long]
+        rel.getStartNode.getProperty("name").toString
     }
     Set(node.getRelationships(Direction.INCOMING, DynamicRelationshipType.withName("RT")).toList.map(extractFunc): _*)
   }

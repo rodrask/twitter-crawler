@@ -63,6 +63,21 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
   }
 
   def indexUsers()={
+    withTx{
+      implicit db =>
+        getAllNodes foreach{
+          node: Node =>
+            val name = node("name")
+            if (name.isDefined){
+              userIndex += (node, "name", name.get)
+              println("indexed %s".format(name.get))
+            }
+            else{
+              println("No name for %s".format(node.toString))
+            }
+
+        }
+    }
 
   }
   def friends(user: String)={

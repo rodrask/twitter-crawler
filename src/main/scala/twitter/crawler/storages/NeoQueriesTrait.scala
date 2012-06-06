@@ -107,15 +107,30 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     }
   }
 
+  def extractInt(field: String)(row: Map[String, Any]): Long = {
+    row.getOrElse(field, None) match {
+
+      case l: Long => l
+      case s => println(s);-1
+    }
+  }
+
   val toSec: Long => Long = x => x / 1000
   val extractTimestamps: Map[String, Any] => SortedSet[Long] = extractSortedSet[Long]("timestamps", toSec)(_)
   val extractNodes: Map[String, Any] => List[String] = extractList[String]("nodes")(_)
   val extractName: Map[String, Any] => String = extractProperty("name")(_)
+  val extractRt: Map[String, Any] => Long = extractInt("rt_count")(_)
 
   val extractUrlsFactors: ExecutionResult => Iterator[(String, UrlData)] = {
     result: ExecutionResult =>
       for (row: Map[String, Any] <- result)
       yield (extractName(row), UrlData(extractTimestamps(row), extractNodes(row)))
+  }
+
+  val extractUsersRT: ExecutionResult => Iterator[(String, Long, SortedSet[Long])] = {
+    result: ExecutionResult =>
+      for (row: Map[String, Any] <- result)
+      yield (extractName(row), extractRt(row), extractTimestamps(row))
   }
 
   val extractSingleUrlFactors: ExecutionResult => UrlData = {
@@ -189,22 +204,15 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractSingleUrlFactors apply makeQuery(query, Map("url" -> url, "from" -> from, "to" -> to))
   }
 
-  def numberOfRT(from: String, to: String): Long ={
+  def userRT(username: String)={
     val query =
       """
-        start fromUser=node:users(name={from}), toUser=node:users(name={to})
-        match fromUser-[r:RT]->toUser
-        return count(r) as result
+        start user=node:users(name={username})
+        match ()<-[p:POSTED]-retweeter-[r:RT]->user
+        return retweeter.name as name, count(r) as rt_count, collect(p.ts) as timestamps
       """
-    val extractFunc: ExecutionResult => Long = {
-      result =>
-        if (result.hasNext)
-          result.next().getOrElse("result", 0).asInstanceOf[Long]
-        else
-          0
+    extractUsersRT apply makeQuery(query, Map("username" -> username))
     }
-    extractFunc apply makeQuery(query, Map("from" -> from, "to" -> to))
-  }
 
   def urlsStream(): Iterable[String] = {
     val relType = DynamicRelationshipType.withName("POSTED")
