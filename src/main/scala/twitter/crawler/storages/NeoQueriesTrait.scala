@@ -107,11 +107,10 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     }
   }
 
-  def extractInt(field: String)(row: Map[String, Any]): Long = {
+  def extractLong(field: String)(row: Map[String, Any]): Long = {
     row.getOrElse(field, None) match {
-
       case l: Long => l
-      case s => println(s);-1
+      case s => println(s); -1
     }
   }
 
@@ -119,7 +118,7 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
   val extractTimestamps: Map[String, Any] => SortedSet[Long] = extractSortedSet[Long]("timestamps", toSec)(_)
   val extractNodes: Map[String, Any] => List[String] = extractList[String]("nodes")(_)
   val extractName: Map[String, Any] => String = extractProperty("name")(_)
-  val extractRt: Map[String, Any] => Long = extractInt("rt_count")(_)
+  val extractRt: Map[String, Any] => Long = extractLong("rt_count")(_)
 
   val extractUrlsFactors: ExecutionResult => Iterator[(String, UrlData)] = {
     result: ExecutionResult =>
@@ -127,10 +126,9 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
       yield (extractName(row), UrlData(extractTimestamps(row), extractNodes(row)))
   }
 
-  val extractUsersRT: ExecutionResult => Iterator[(String, Long, SortedSet[Long])] = {
+  val extractUsersRT: ExecutionResult => List[(String, Long)] = {
     result: ExecutionResult =>
-      for (row: Map[String, Any] <- result)
-      yield (extractName(row), extractRt(row), extractTimestamps(row))
+      result.map(row => (extractName(row), extractRt(row)) ).toList
   }
 
   val extractSingleUrlFactors: ExecutionResult => UrlData = {
@@ -204,20 +202,38 @@ trait NeoQueriesTrait extends Neo4jWrapper with Neo4jIndexProvider with Embedded
     extractSingleUrlFactors apply makeQuery(query, Map("url" -> url, "from" -> from, "to" -> to))
   }
 
-  def userRT(username: String)={
+  def userRT(username: String) = {
     val query =
       """
         start user=node:users(name={username})
-        match ()<-[p:POSTED]-retweeter-[r:RT]->user
-        return retweeter.name as name, count(r) as rt_count, collect(p.ts) as timestamps
+        match retweeter-[r:RT]->user
+        return retweeter.name as name, count(r) as rt_count
       """
     extractUsersRT apply makeQuery(query, Map("username" -> username))
+  }
+
+  def user2userRT(userFrom: String, userTo: String): Long = {
+    val query =
+      """
+        start userFrom=node:users(name={userFrom}), userTo=node:users(name={userTo})
+        match userFrom-[r:RT]->userTo
+        return count(r) as rt_count
+      """
+    val result = makeQuery(query, Map("userFrom" -> userFrom, "userTo" -> userTo))
+    if (result.isEmpty)
+      0
+    else {
+      result.next().getOrElse("rt_count", None) match {
+        case l: Long => l
+        case s => 0
+      }
     }
+  }
 
   def urlsStream(): Iterable[String] = {
     val relType = DynamicRelationshipType.withName("POSTED")
     GlobalGraphOperations.at(ds.gds).getAllNodes.asScala.
       filter(n => n.getProperty("nodeType", "") == "ENTITY" && n.getRelationships(Direction.INCOMING, relType).asScala.size > 10).
-      map(n => n.getProperty("name").toString )
+      map(n => n.getProperty("name").toString)
   }
 }

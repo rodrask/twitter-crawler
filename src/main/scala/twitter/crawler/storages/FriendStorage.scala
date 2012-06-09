@@ -53,7 +53,6 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
       """
     val extractFunc: ExecutionResult => Boolean = {
       result =>
-        println(result)
         if (result.hasNext)
           !result.next().isEmpty
         else
@@ -80,19 +79,17 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
     }
 
   }
-  def friends(user: String)={
+  def followers(user: String): Set[String]={
     val query =
       """
-        start fromUser=node:users(name={user})
-        match fromUser-[r:READS]->toUser
-        return collect(toUser.name) as result
+        start user=node:users(name={user})
+        match fromUser-[r:READS]->user
+        where has(fromUser.name)
+        return collect(fromUser.name?) as user
       """
-    val extractFunc: ExecutionResult => Unit = {
+    val extractFunc: ExecutionResult => Set[String] = {
       result =>
-        result foreach {
-          r =>
-            println(r)
-        }
+        result.map[String](row => row("user").toString).toSet
     }
     extractFunc apply makeQuery(query, Map("user" -> user))
   }

@@ -48,50 +48,76 @@ object Main extends App {
     writer.close()
   }
 
+  val writer = new FileWriter("/home/pokunev/Dropbox/twitter/user-features.csv")
+
+  def save2File(user1: String, user2: String, isFollower: Boolean, rt: Long, it: Double) = {
+    writer.write("%s\t%s\t%s\t%s\t%s\n".format(user1, user2, isFollower, rt, it.toString))
+  }
+
   def calculateUsersFeatures() = {
     val reader = Source.fromFile("/home/pokunev/Dropbox/twitter/names5000.txt")
-    //    reader.getLines() foreach {
-    //      line: String =>
-    //        val
+    reader.getLines() foreach {
+      name: String =>
+        calculateFeaturesForUser(name)
+    }
+    writer.close()
   }
 
-  def calcForUser(user: String) = {
+
+  def calculateFeaturesForUser(user: String) = {
     val userTs = getTs(user)
-    var rt: Long = _
-    var friend: Boolean = _
-    var follower: Boolean = _
-    var retweeterTs: SortedSet[Long] = _
-    var directIt: Double = _
-    var reverseIt: Double = _
-    GraphStorage.userRT(user) foreach {
-      case (name, count) =>
+    var rt: Long = 0
+    var isFollower: Boolean = false
+    var retweeterTs: SortedSet[Long] = SortedSet.empty[Long]
+    var directIt: Double = 0.0
+    val rtResult = GraphStorage.userRT(user)
+    val rtUsers = rtResult.map(t => t._1).toSet
+    rtResult foreach {
+      tuple =>
+        val name = tuple._1
+        val count = tuple._2
         rt = count
-        friend = FriendStorage.isRead(user, name)
-        follower = FriendStorage.isRead(name, user)
+        isFollower = FriendStorage.isRead(name, user)
         retweeterTs = getTs(name)
         if (!userTs.isEmpty && !retweeterTs.isEmpty) {
-            directIt = JoinedProcesses.calculateIT(userTs, retweeterTs)
-            reverseIt = JoinedProcesses.calculateIT(retweeterTs, userTs)
+          directIt = JoinedProcesses.calculateIT(userTs, retweeterTs)
         }
+        else {
+          directIt = 0.0
+        }
+        save2File(user, name, isFollower, rt, directIt)
     }
-    println("%s %s %d %d %d ")
-  }
 
+    val followers: Set[String] = FriendStorage.followers(user)
+    followers foreach {
+      follower =>
+        if (!rtUsers.contains(follower)) {
+          isFollower = true
+          retweeterTs = getTs(follower)
+          if (!userTs.isEmpty && !retweeterTs.isEmpty) {
+            directIt = JoinedProcesses.calculateIT(userTs, retweeterTs)
+          }
+          else {
+            directIt = 0.0
+          }
+          rt = GraphStorage.user2userRT(follower, user)
+        }
+        save2File(user, follower, isFollower, rt, directIt)
+    }
+
+  }
   var tsCache: mutable.Map[String, SortedSet[Long]] = mutable.Map()
 
   def getTs(user: String): SortedSet[Long] = {
     if (!(tsCache contains user)) {
-      val ts = GraphStorage.userUrlsTs(user)
+      val (name, ts) = GraphStorage.getUserUrlsTs(user)
       if (ts.size >= 10)
-        tsCache += ((user, ts))
+        tsCache += ((user, SortedSet[Long](ts:_*)))
       else
         tsCache += ((user, SortedSet.empty[Long]))
     }
+
     tsCache(user)
   }
-
-  GraphStorage.userRT("navalny") foreach {
-    tuple =>
-      println(tuple)
-  }
+  calculateUsersFeatures()
 }
