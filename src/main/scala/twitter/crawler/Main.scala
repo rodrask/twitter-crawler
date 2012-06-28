@@ -119,5 +119,5 @@ object Main extends App {
 
     tsCache(user)
   }
-  calculateUsersFeatures()
+  GraphStorage.dumpPostEgdes(new FileWriter("/home/pokunev/Dropbox/twitter/post-graph.csv"))
 }

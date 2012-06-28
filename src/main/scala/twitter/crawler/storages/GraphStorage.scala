@@ -14,6 +14,7 @@ import actors.Actor
 import twitter4j.{Tweet, Status, User}
 import collection.immutable.SortedSet
 import java.io.Writer
+import org.neo4j.tooling.GlobalGraphOperations
 
 object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with NeoQueriesTrait with Logging with Actor {
   val USER_ID = "twId"
@@ -387,6 +388,25 @@ object GraphStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGr
 
     }
   }
+
+  val getName = (node: Node) => node.getProperty("name", "unknown")
+  val getTs: Relationship => Long = (rel: Relationship) => rel.getProperty("ts",-1l).asInstanceOf[Long]
+  val getId: Relationship => Long = (rel: Relationship) => rel.getProperty("baseMessageId",-1l).asInstanceOf[Long]
+
+  def dumpRTEgdes(writer: Writer) = {
+    GlobalGraphOperations.at(ds.gds).getAllRelationships filter {r => r.isType(DynamicRelationshipType.withName("RT"))} foreach {
+      rel =>
+        writer.write("%s\t%s\t%d\t%d\n".format(getName(rel.getStartNode), getName(rel.getEndNode), getTs(rel), getId(rel)))
+    }
+  }
+
+  def dumpPostEgdes(writer: Writer) = {
+    GlobalGraphOperations.at(ds.gds).getAllRelationships filter {r => r.isType(DynamicRelationshipType.withName("POSTED"))} foreach {
+      rel =>
+        writer.write("%s\t%s\t%s\n".format(getName(rel.getStartNode), getName(rel.getEndNode), getTs(rel)))
+    }
+  }
+
 
 
 }

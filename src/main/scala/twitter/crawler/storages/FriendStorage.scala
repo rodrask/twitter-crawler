@@ -14,6 +14,7 @@ import twitter4j.User
 import collection.immutable.SortedSet
 import java.io.Writer
 import org.neo4j.cypher.ExecutionResult
+import org.neo4j.tooling.GlobalGraphOperations
 
 object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedGraphDatabaseServiceProvider with NeoQueriesTrait with Logging {
   val USER_ID = "twId"
@@ -44,7 +45,7 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
     shutdown(ds)
   }
 
-  def isRead(user1:String, user2: String): Boolean={
+  def isRead(user1: String, user2: String): Boolean = {
     val query =
       """
         start fromUser=node:users(name={from}), toUser=node:users(name={to})
@@ -61,17 +62,17 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
     extractFunc apply makeQuery(query, Map("from" -> user1, "to" -> user2))
   }
 
-  def indexUsers()={
-    withTx{
+  def indexUsers() = {
+    withTx {
       implicit db =>
-        getAllNodes foreach{
+        getAllNodes foreach {
           node: Node =>
             val name = node("name")
-            if (name.isDefined){
-              userIndex += (node, "name", name.get)
+            if (name.isDefined) {
+              userIndex +=(node, "name", name.get)
               println("indexed %s".format(name.get))
             }
-            else{
+            else {
               println("No name for %s".format(node.toString))
             }
 
@@ -79,7 +80,8 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
     }
 
   }
-  def followers(user: String): Set[String]={
+
+  def followers(user: String): Set[String] = {
     val query =
       """
         start user=node:users(name={user})
@@ -92,5 +94,13 @@ object FriendStorage extends Neo4jWrapper with Neo4jIndexProvider with EmbeddedG
         result.map[String](row => row("user").toString).toSet
     }
     extractFunc apply makeQuery(query, Map("user" -> user))
+  }
+
+  def dumpEgdes(writer: Writer) = {
+    val getName = (node: Node) => node.getProperty("name", "unknown")
+    GlobalGraphOperations.at(ds.gds).getAllRelationships foreach {
+      rel =>
+        writer.write("%s\t%s\t%s\n".format(getName(rel.getStartNode), getName(rel.getEndNode), rel.getType.toString))
+    }
   }
 }
